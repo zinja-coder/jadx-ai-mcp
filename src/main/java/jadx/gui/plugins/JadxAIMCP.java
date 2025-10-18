@@ -30,6 +30,16 @@ import jadx.gui.JadxWrapper;
 import jadx.gui.ui.MainWindow;
 import jadx.gui.settings.JadxSettings;
 
+//debug
+import jadx.gui.ui.panel.JDebuggerPanel;  
+import jadx.gui.ui.panel.IDebugController; 
+import jadx.gui.device.debugger.DebugController;
+import jadx.gui.ui.codearea.SmaliArea;
+import jadx.gui.utils.JumpPosition;
+import jadx.gui.treemodel.JClass;
+
+
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +47,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Document;
 
 import javax.swing.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.TreeNode;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -239,6 +251,29 @@ public class JadxAIMCP implements JadxPlugin {
             app.get("/rename-method", this::handleRenameMethod);
             app.get("/rename-field", this::handleRenameField);
             app.get("/health", this::handleHealth);
+
+
+            // In start() method, ensure these routes are registered:
+app.get("/debug/status", this::handleDebugStatus);
+app.post("/debug/initialize", this::handleDebugInitialize);
+app.post("/debug/attach", this::handleDebugAttach);
+app.post("/debug/detach", this::handleDebugDetach);
+app.post("/debug/set-breakpoint", this::handleSetBreakpoint);
+app.post("/debug/remove-breakpoint", this::handleRemoveBreakpoint);
+app.get("/debug/list-breakpoints", this::handleListBreakpoints);
+app.post("/debug/step-over", this::handleStepOver);
+app.post("/debug/step-into", this::handleStepInto);
+app.post("/debug/step-out", this::handleStepOut);
+app.post("/debug/resume", this::handleResume);
+app.post("/debug/suspend", this::handleSuspend);
+app.get("/debug/stack-frames", this::handleGetStackFrames);
+app.get("/debug/variables", this::handleGetVariables);
+app.get("/debug/threads", this::handleGetThreads);
+// Add to start() method with other routes
+app.get("/smali-debug", this::handleGetSmaliForDebug);
+app.get("/method-smali-debug", this::handleGetMethodSmaliForDebug);
+
+
 
             logger.info(
                     "// -------------------- JADX AI MCP PLUGIN -------------------- //\n - By Jafar Pathan (https://github.com/zinja-coder)\n - To Report Issues : https://github.com/zinja-coder/jadx-ai-mcp\n\n");
@@ -1469,6 +1504,932 @@ private void handleStrings(Context ctx) {
             ctx.status(500).json(Map.of("error", "Internal error while retrieving resource file: " + e.getMessage()));
         }
     }
+
+       // ==================== VERIFIED DEBUG HANDLERS ====================
+
+/**
+ * Get debugger status - VERIFIED with JDebuggerPanel API
+ */
+private void handleDebugStatus(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        Map<String, Object> status = new HashMap<>();
+        
+        if (debuggerPanel == null) {
+            status.put("available", false);
+            status.put("attached", false);
+            status.put("message", "Debugger panel not initialized. Open Tools -> Debugger first.");
+            ctx.json(status);
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null) {
+            status.put("available", true);
+            status.put("attached", false);
+            status.put("message", "Debugger controller not initialized");
+        } else {
+            status.put("available", true);
+            status.put("attached", controller.isDebugging());
+            status.put("suspended", controller.isSuspended());
+            status.put("processName", controller.getProcessName());
+        }
+        
+        ctx.json(status);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to get debug status: " + e.getMessage()));
+    }
+}
+
+/**
+ * Initialize debugger panel - VERIFIED
+ */
+/**
+ * Initialize debugger panel - FIXED for private access
+ */
+private void handleDebugInitialize(Context ctx) {
+    try {
+        final Map<String, Object> result = new HashMap<>();
+        
+        SwingUtilities.invokeLater(() -> {
+            try {
+                JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+                if (debuggerPanel == null) {
+                    // Try menu approach first
+                    JMenuBar menuBar = mainWindow.getJMenuBar();
+                    boolean initialized = false;
+                    
+                    for (int i = 0; i < menuBar.getMenuCount(); i++) {
+                        JMenu menu = menuBar.getMenu(i);
+                        if (menu != null && "Tools".equals(menu.getText())) {
+                            for (int j = 0; j < menu.getItemCount(); j++) {
+                                JMenuItem item = menu.getItem(j);
+                                if (item != null && item.getText() != null && 
+                                    item.getText().contains("Debugger")) {
+                                    item.doClick();
+                                    initialized = true;
+                                    logger.info("JADX AI MCP: Debugger panel initialized via menu");
+                                    break;
+                                }
+                            }
+                            if (initialized) break;
+                        }
+                    }
+                    
+                    // If menu approach fails, use reflection
+                    if (!initialized) {
+                        try {
+                            java.lang.reflect.Method method = MainWindow.class.getDeclaredMethod("initDebuggerPanel");
+                            method.setAccessible(true);
+                            method.invoke(mainWindow);
+                            logger.info("JADX AI MCP: Debugger panel initialized via reflection");
+                        } catch (Exception e) {
+                            logger.error("JADX AI MCP: Failed to initialize debugger panel", e);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("JADX AI MCP: Error initializing debugger panel", e);
+            }
+        });
+        
+        // Wait for UI thread
+        Thread.sleep(500);
+        
+        result.put("success", mainWindow.getDebuggerPanel() != null);
+        result.put("message", "Debugger panel initialization requested");
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to initialize debugger: " + e.getMessage()));
+    }
+}
+
+
+/**
+ * Attach debugger - VERIFIED with showDebugger method signature
+ */
+private void handleDebugAttach(Context ctx) {
+    try {
+        String processName = ctx.queryParam("process");
+        String host = ctx.queryParamAsClass("host", String.class).getOrDefault("localhost");
+        String portStr = ctx.queryParamAsClass("port", String.class).getOrDefault("8700");
+        String androidVerStr = ctx.queryParamAsClass("androidVer", String.class).getOrDefault("29");
+        String pid = ctx.queryParam("pid");
+        
+        if (processName == null || processName.isEmpty()) {
+            ctx.status(400).json(Map.of("error", "Missing required parameter: process"));
+            return;
+        }
+        
+        int port = Integer.parseInt(portStr);
+        int androidVer = Integer.parseInt(androidVerStr);
+        
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized. Call /debug/initialize first"));
+            return;
+        }
+        
+        // showDebugger signature from JDebuggerPanel.java line 377:
+        // public boolean showDebugger(String procName, String host, int port, int androidVer, ADBDevice device, String pid)
+        boolean success = debuggerPanel.showDebugger(processName, host, port, androidVer, null, pid);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", success);
+        result.put("attached", success);
+        result.put("process", processName);
+        result.put("host", host);
+        result.put("port", port);
+        result.put("androidVersion", androidVer);
+        
+        if (success) {
+            result.put("message", "Successfully attached to " + processName + " at " + host + ":" + port);
+            logger.info("JADX AI MCP: Debugger attached to " + processName);
+        } else {
+            result.put("message", "Failed to attach. Ensure ADB is connected and JDWP port is forwarded.");
+        }
+        
+        ctx.json(result);
+    } catch (NumberFormatException e) {
+        ctx.status(400).json(Map.of("error", "Invalid port or android version format"));
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to attach debugger: " + e.getMessage()));
+    }
+}
+
+/**
+ * Detach/stop debugger - VERIFIED (uses stop() method)
+ */
+private void handleDebugDetach(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached to any process"));
+            return;
+        }
+        
+        // From JDebuggerPanel.java line 226: controller.stop()
+        controller.stop();
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "Debugger detached successfully");
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to detach debugger: " + e.getMessage()));
+    }
+}
+
+/**
+ * Step over - VERIFIED (line 202)
+ */
+private void handleStepOver(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        if (!controller.isSuspended()) {
+            ctx.status(400).json(Map.of("error", "Process not suspended. Cannot step while running."));
+            return;
+        }
+        
+        // From line 202: controller.stepOver()
+        controller.stepOver();
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("action", "step_over");
+        result.put("message", "Step over executed");
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to step over: " + e.getMessage()));
+    }
+}
+
+/**
+ * Step into - VERIFIED (line 211)
+ */
+private void handleStepInto(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        if (!controller.isSuspended()) {
+            ctx.status(400).json(Map.of("error", "Process not suspended"));
+            return;
+        }
+        
+        // From line 211: controller.stepInto()
+        controller.stepInto();
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("action", "step_into");
+        result.put("message", "Step into executed");
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to step into: " + e.getMessage()));
+    }
+}
+
+/**
+ * Step out - VERIFIED (line 220)
+ */
+private void handleStepOut(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        if (!controller.isSuspended()) {
+            ctx.status(400).json(Map.of("error", "Process not suspended"));
+            return;
+        }
+        
+        // From line 220: controller.stepOut()
+        controller.stepOut();
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("action", "step_out");
+        result.put("message", "Step out executed");
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to step out: " + e.getMessage()));
+    }
+}
+
+/**
+ * Resume execution - VERIFIED (line 238: controller.run())
+ */
+private void handleResume(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        if (!controller.isSuspended()) {
+            ctx.status(400).json(Map.of("error", "Process not suspended. Already running."));
+            return;
+        }
+        
+        // From line 238: if (controller.isSuspended()) { controller.run(); }
+        controller.run();
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("action", "resume");
+        result.put("message", "Execution resumed");
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to resume: " + e.getMessage()));
+    }
+}
+
+/**
+ * Pause/suspend execution - VERIFIED (line 240: controller.pause())
+ */
+private void handleSuspend(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        if (controller.isSuspended()) {
+            ctx.status(400).json(Map.of("error", "Process already suspended"));
+            return;
+        }
+        
+        // From line 240: else { controller.pause(); }
+        controller.pause();
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("action", "suspend");
+        result.put("message", "Execution paused");
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to suspend: " + e.getMessage()));
+    }
+}
+
+/**
+ * Navigate to breakpoint location - Breakpoints are UI-only in JADX
+ */
+/**
+ * Navigate to breakpoint location - FIXED codeJump
+ */
+/**
+ * Navigate to breakpoint location - COMPLETE FIX
+ */
+private void handleSetBreakpoint(Context ctx) {
+    String className = ctx.queryParam("class");
+    String lineStr = ctx.queryParam("line");
+    
+    if (className == null || lineStr == null) {
+        ctx.status(400).json(Map.of("error", "Missing class or line parameter"));
+        return;
+    }
+    
+    try {
+        int line = Integer.parseInt(lineStr);
+        className = className.replace("/", ".");
+        
+        JadxWrapper wrapper = mainWindow.getWrapper();
+        JavaClass targetClass = null;
+        for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
+            if (cls.getFullName().equals(className)) {
+                targetClass = cls;
+                break;
+            }
+        }
+        
+        if (targetClass == null) {
+            ctx.status(404).json(Map.of("error", "Class not found: " + className));
+            return;
+        }
+        
+        // Navigate using TabsController - need to convert JavaClass to JClass (JNode)
+        final JavaClass finalTargetClass = targetClass;
+        SwingUtilities.invokeLater(() -> {
+            try {
+                // Get JClass (GUI tree node) from JavaClass
+                jadx.gui.treemodel.JClass jClass = mainWindow.getCacheObject().getNodeCache().makeFrom(finalTargetClass);
+                
+                // Use TabsController's codeJump with JNode
+                mainWindow.getTabsController().codeJump(
+                    new jadx.gui.utils.JumpPosition(jClass)
+                );
+                
+                //logger.info("JADX AI MCP: Navigated to " + className + " for breakpoint at line " + line);
+            } catch (Exception e) {
+                logger.error("JADX AI MCP: Failed to navigate to class", e);
+            }
+        });
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("class", className);
+        result.put("line", line);
+        result.put("message", "Navigated to " + className + ". Set breakpoint manually in Smali view (F2) at line " + line);
+        result.put("note", "Breakpoints in JADX must be toggled via UI - press F2 on desired line in Smali view");
+        ctx.json(result);
+    } catch (NumberFormatException e) {
+        ctx.status(400).json(Map.of("error", "Invalid line number"));
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to navigate: " + e.getMessage()));
+    }
+}
+
+/**
+ * Get Smali bytecode with line numbers for debugging.
+ * This returns the Smali code with line number annotations to help
+ * identify exact positions for setting breakpoints.
+ */
+private void handleGetSmaliForDebug(Context ctx) {
+    String className = ctx.queryParam("class");
+    
+    if (className == null || className.isEmpty()) {
+        logger.error("JADX AI MCP Error: Missing class parameter.");
+        ctx.status(400).json(Map.of("error", "Missing class parameter."));
+        return;
+    }
+    
+    className = className.replace("/", ".");
+    
+    try {
+        JadxWrapper wrapper = mainWindow.getWrapper();
+        
+        for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
+            if (cls.getFullName().equals(className)) {
+                // Get the Smali code
+                String smaliCode = cls.getSmali();
+                
+                if (smaliCode == null || smaliCode.isEmpty()) {
+                    ctx.status(404).json(Map.of("error", "Smali code not available for this class"));
+                    return;
+                }
+                
+                // Split into lines and add line numbers
+                String[] lines = smaliCode.split("\n");
+                List<Map<String, Object>> numberedLines = new ArrayList<>();
+                
+                for (int i = 0; i < lines.length; i++) {
+                    Map<String, Object> lineInfo = new HashMap<>();
+                    lineInfo.put("lineNumber", i + 1);
+                    lineInfo.put("content", lines[i]);
+                    
+                    // Identify debuggable lines (instructions, not comments or empty lines)
+                    String trimmed = lines[i].trim();
+                    boolean isDebuggable = !trimmed.isEmpty() 
+                        && !trimmed.startsWith("#") 
+                        && !trimmed.startsWith(".") 
+                        && !trimmed.equals("");
+                    
+                    lineInfo.put("debuggable", isDebuggable);
+                    
+                    // Identify method boundaries
+                    if (trimmed.startsWith(".method")) {
+                        lineInfo.put("methodStart", true);
+                    } else if (trimmed.startsWith(".end method")) {
+                        lineInfo.put("methodEnd", true);
+                    }
+                    
+                    numberedLines.add(lineInfo);
+                }
+                
+                Map<String, Object> result = new HashMap<>();
+                result.put("class", cls.getFullName());
+                result.put("type", "smali-debug");
+                result.put("totalLines", lines.length);
+                result.put("lines", numberedLines);
+                result.put("rawSmali", smaliCode);
+                
+                ctx.json(result);
+                return;
+            }
+        }
+        
+        ctx.status(404).json(Map.of("error", "Class not found."));
+        logger.error("JADX AI MCP Error: Class not found.");
+        
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Internal error retrieving Smali for debug: " + e.getMessage()));
+    }
+}
+
+/**
+ * Get method-level Smali code with line numbers for precise breakpoint placement
+ */
+private void handleGetMethodSmaliForDebug(Context ctx) {
+    String className = ctx.queryParam("class");
+    String methodName = ctx.queryParam("method");
+    
+    if (className == null || className.isEmpty()) {
+        ctx.status(400).json(Map.of("error", "Missing class parameter"));
+        return;
+    }
+    
+    if (methodName == null || methodName.isEmpty()) {
+        ctx.status(400).json(Map.of("error", "Missing method parameter"));
+        return;
+    }
+    
+    className = className.replace("/", ".");
+    
+    try {
+        JadxWrapper wrapper = mainWindow.getWrapper();
+        
+        for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
+            if (cls.getFullName().equals(className)) {
+                // Get full Smali code
+                String smaliCode = cls.getSmali();
+                
+                if (smaliCode == null || smaliCode.isEmpty()) {
+                    ctx.status(404).json(Map.of("error", "Smali code not available"));
+                    return;
+                }
+                
+                // Parse and find the specific method
+                String[] lines = smaliCode.split("\n");
+                List<Map<String, Object>> methodLines = new ArrayList<>();
+                boolean inMethod = false;
+                int methodStartLine = -1;
+                int absoluteLineNumber = 0;
+                
+                for (int i = 0; i < lines.length; i++) {
+                    absoluteLineNumber = i + 1;
+                    String line = lines[i];
+                    String trimmed = line.trim();
+                    
+                    // Check if this is the start of our target method
+                    if (trimmed.startsWith(".method") && trimmed.contains(methodName)) {
+                        inMethod = true;
+                        methodStartLine = absoluteLineNumber;
+                    }
+                    
+                    if (inMethod) {
+                        Map<String, Object> lineInfo = new HashMap<>();
+                        lineInfo.put("absoluteLine", absoluteLineNumber);
+                        lineInfo.put("relativeLine", absoluteLineNumber - methodStartLine + 1);
+                        lineInfo.put("content", line);
+                        
+                        // Mark debuggable lines
+                        boolean isDebuggable = !trimmed.isEmpty() 
+                            && !trimmed.startsWith("#") 
+                            && !trimmed.startsWith(".method")
+                            && !trimmed.startsWith(".end method")
+                            && !trimmed.startsWith(".locals")
+                            && !trimmed.startsWith(".param")
+                            && !trimmed.startsWith(".annotation")
+                            && !trimmed.startsWith(".end annotation");
+                        
+                        lineInfo.put("debuggable", isDebuggable);
+                        
+                        methodLines.add(lineInfo);
+                        
+                        // Check if method ends
+                        if (trimmed.startsWith(".end method")) {
+                            break;
+                        }
+                    }
+                }
+                
+                if (methodLines.isEmpty()) {
+                    ctx.status(404).json(Map.of("error", "Method not found: " + methodName));
+                    return;
+                }
+                
+                Map<String, Object> result = new HashMap<>();
+                result.put("class", cls.getFullName());
+                result.put("method", methodName);
+                result.put("type", "smali-method-debug");
+                result.put("methodStartLine", methodStartLine);
+                result.put("totalLines", methodLines.size());
+                result.put("lines", methodLines);
+                
+                ctx.json(result);
+                return;
+            }
+        }
+        
+        ctx.status(404).json(Map.of("error", "Class not found"));
+        
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Internal error: " + e.getMessage()));
+    }
+}
+
+
+
+// ==================== EXTRACT DATA FROM UI COMPONENTS ====================
+
+/**
+ * Get all variables (registers and 'this' object fields)
+ * Extracts from JTree UI components: regTreeNode and thisTreeNode
+ */
+private void handleGetVariables(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        if (!controller.isSuspended()) {
+            ctx.status(400).json(Map.of("error", "Process not suspended. Variables only available when paused."));
+            return;
+        }
+        
+        Map<String, Object> variables = new HashMap<>();
+        
+        // Access the variable tree through reflection since fields are private
+        try {
+            // Get regTreeNode (registers/local variables)
+            java.lang.reflect.Field regField = JDebuggerPanel.class.getDeclaredField("regTreeNode");
+            regField.setAccessible(true);
+            DefaultMutableTreeNode regTreeNode = (DefaultMutableTreeNode) regField.get(debuggerPanel);
+            
+            // Get thisTreeNode (object fields)
+            java.lang.reflect.Field thisField = JDebuggerPanel.class.getDeclaredField("thisTreeNode");
+            thisField.setAccessible(true);
+            DefaultMutableTreeNode thisTreeNode = (DefaultMutableTreeNode) thisField.get(debuggerPanel);
+            
+            // Extract register variables
+            List<Map<String, Object>> registers = extractTreeNodeData(regTreeNode);
+            variables.put("registers", registers);
+            
+            // Extract 'this' object fields
+            List<Map<String, Object>> thisFields = extractTreeNodeData(thisTreeNode);
+            variables.put("thisObject", thisFields);
+            
+            ctx.json(variables);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            ctx.status(500).json(Map.of("error", "Failed to access tree nodes: " + e.getMessage()));
+        }
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to get variables: " + e.getMessage()));
+    }
+}
+
+/**
+ * Helper method to extract data from JTree nodes
+ * Uses standard Swing TreeNode API
+ */
+private List<Map<String, Object>> extractTreeNodeData(DefaultMutableTreeNode node) {
+    List<Map<String, Object>> result = new ArrayList<>();
+    
+    // Iterate through all children of the node
+    for (int i = 0; i < node.getChildCount(); i++) {
+        TreeNode childNode = node.getChildAt(i);
+        
+        if (childNode instanceof JDebuggerPanel.ValueTreeNode) {
+            JDebuggerPanel.ValueTreeNode valueNode = (JDebuggerPanel.ValueTreeNode) childNode;
+            
+            Map<String, Object> varInfo = new HashMap<>();
+            varInfo.put("name", valueNode.getName());
+            varInfo.put("value", valueNode.getValue());
+            varInfo.put("type", valueNode.getType());
+            varInfo.put("typeId", valueNode.getTypeID());
+            varInfo.put("updated", valueNode.isUpdated());
+            
+            // Recursively extract children if any
+            if (valueNode.getChildCount() > 0) {
+                varInfo.put("children", extractTreeNodeData(valueNode));
+            }
+            
+            result.add(varInfo);
+        }
+    }
+    
+    return result;
+}
+
+/**
+ * Get stack frames from JList UI component
+ * Uses DefaultListModel API
+ */
+private void handleGetStackFrames(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        if (!controller.isSuspended()) {
+            ctx.status(400).json(Map.of("error", "Process not suspended. Stack frames only available when paused."));
+            return;
+        }
+        
+        try {
+            // Access stackFrameList through reflection
+            java.lang.reflect.Field stackField = JDebuggerPanel.class.getDeclaredField("stackFrameList");
+            stackField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            JList<JDebuggerPanel.IListElement> stackFrameList = (JList<JDebuggerPanel.IListElement>) stackField.get(debuggerPanel);
+            
+            // Get the list model
+            DefaultListModel<JDebuggerPanel.IListElement> model = 
+                (DefaultListModel<JDebuggerPanel.IListElement>) stackFrameList.getModel();
+            
+            List<String> frames = new ArrayList<>();
+            
+            // Iterate through all elements in the list
+            for (int i = 0; i < model.getSize(); i++) {
+                JDebuggerPanel.IListElement element = model.getElementAt(i);
+                frames.add(element.toString());
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("stackFrames", frames);
+            result.put("count", frames.size());
+            
+            ctx.json(result);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            ctx.status(500).json(Map.of("error", "Failed to access stack frame list: " + e.getMessage()));
+        }
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to get stack frames: " + e.getMessage()));
+    }
+}
+
+/**
+ * Get threads from JComboBox UI component
+ * Uses DefaultComboBoxModel API
+ */
+private void handleGetThreads(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        IDebugController controller = debuggerPanel.getDbgController();
+        if (controller == null || !controller.isDebugging()) {
+            ctx.status(400).json(Map.of("error", "Debugger not attached"));
+            return;
+        }
+        
+        try {
+            // Access threadBox through reflection
+            java.lang.reflect.Field threadField = JDebuggerPanel.class.getDeclaredField("threadBox");
+            threadField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            JComboBox<JDebuggerPanel.IListElement> threadBox = 
+                (JComboBox<JDebuggerPanel.IListElement>) threadField.get(debuggerPanel);
+            
+            // Get the combo box model
+            DefaultComboBoxModel<JDebuggerPanel.IListElement> model = 
+                (DefaultComboBoxModel<JDebuggerPanel.IListElement>) threadBox.getModel();
+            
+            List<String> threads = new ArrayList<>();
+            String selectedThread = null;
+            
+            // Iterate through all elements in the combo box
+            for (int i = 0; i < model.getSize(); i++) {
+                JDebuggerPanel.IListElement element = model.getElementAt(i);
+                threads.add(element.toString());
+            }
+            
+            // Get selected thread
+            Object selected = model.getSelectedItem();
+            if (selected != null) {
+                selectedThread = selected.toString();
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("threads", threads);
+            result.put("selectedThread", selectedThread);
+            result.put("count", threads.size());
+            
+            ctx.json(result);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            ctx.status(500).json(Map.of("error", "Failed to access thread box: " + e.getMessage()));
+        }
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to get threads: " + e.getMessage()));
+    }
+}
+
+/**
+ * ADVANCED: Get breakpoints by inspecting SmaliArea components
+ * This requires access to all open SmaliArea tabs
+ */
+/**
+ * ADVANCED: Get breakpoints by inspecting SmaliArea components
+ */
+private void handleListBreakpoints(Context ctx) {
+    try {
+        JDebuggerPanel debuggerPanel = mainWindow.getDebuggerPanel();
+        if (debuggerPanel == null) {
+            ctx.status(400).json(Map.of("error", "Debugger panel not initialized"));
+            return;
+        }
+        
+        List<Map<String, Object>> breakpoints = new ArrayList<>();
+        
+        // Access TabbedPane and find open tabs
+        try {
+            // Get the actual JTabbedPane component
+            java.lang.reflect.Field tabbedPaneField = mainWindow.getTabbedPane().getClass().getDeclaredField("tabbedPane");
+            tabbedPaneField.setAccessible(true);
+            javax.swing.JTabbedPane tabbedPane = (javax.swing.JTabbedPane) tabbedPaneField.get(mainWindow.getTabbedPane());
+            
+            // Iterate through all open tabs
+            for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+                Component comp = tabbedPane.getComponentAt(i);
+                
+                // Find SmaliArea components recursively
+                SmaliArea smaliArea = findSmaliArea(comp);
+                if (smaliArea != null) {
+                    try {
+                        // Access breakpoint information through reflection
+                        java.lang.reflect.Field bpField = SmaliArea.class.getDeclaredField("breakpoints");
+                        bpField.setAccessible(true);
+                        
+                        @SuppressWarnings("unchecked")
+                        Set<Integer> bps = (Set<Integer>) bpField.get(smaliArea);
+                        
+                        if (bps != null && !bps.isEmpty()) {
+                            for (Integer line : bps) {
+                                Map<String, Object> bp = new HashMap<>();
+                                bp.put("class", smaliArea.getNode().getName());
+                                bp.put("line", line);
+                                breakpoints.add(bp);
+                            }
+                        }
+                    } catch (NoSuchFieldException | IllegalAccessException e) {
+                        // Breakpoint field might not exist or be accessible
+                        logger.debug("Could not access breakpoints for tab: " + e.getMessage());
+                    }
+                }
+            }
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            logger.error("Could not access tabbedPane", e);
+            ctx.status(500).json(Map.of("error", "Could not access tabs: " + e.getMessage()));
+            return;
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("breakpoints", breakpoints);
+        result.put("count", breakpoints.size());
+        
+        ctx.json(result);
+    } catch (Exception e) {
+        logger.error("JADX AI MCP Debug Error: " + e.getMessage(), e);
+        ctx.status(500).json(Map.of("error", "Failed to list breakpoints: " + e.getMessage()));
+    }
+}
+
+
+/**
+ * Helper method to find SmaliArea component in component tree
+ */
+private SmaliArea findSmaliArea(Component comp) {
+    if (comp instanceof SmaliArea) {
+        return (SmaliArea) comp;
+    }
+    
+    if (comp instanceof java.awt.Container) {
+        java.awt.Container container = (java.awt.Container) comp;
+        for (Component child : container.getComponents()) {
+            SmaliArea result = findSmaliArea(child);
+            if (result != null) {
+                return result;
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * NOT IMPLEMENTABLE - Breakpoints are managed by SmaliArea UI component
+ */
+private void handleRemoveBreakpoint(Context ctx) {
+    ctx.status(501).json(Map.of(
+        "error", "Not implemented",
+        "reason", "JADX breakpoints are UI-managed. Remove manually in Smali view (F2)."
+    ));
+}
+
 
     // -------------------------- helper methods to assist the request handler methods -------------------------- //
     private String getSelectedTabTitle() {
