@@ -13,12 +13,12 @@ import java.util.ArrayList;
 public class JadxAIMCPPaginationUtils {
 
     // Configuration constants
-    public static final int DEFAULT_PAGE_SIZE = 100;
-    public static final int MAX_PAGE_SIZE = 10000;
-    public static final int MAX_OFFSET = 1000000;
+    public final int DEFAULT_PAGE_SIZE = 100;
+    public final int MAX_PAGE_SIZE = 10000;
+    public final int MAX_OFFSET = 1000000;
 
     // Generic pagination handler that can be used by any endpoint
-    public static <T> Map<String, Object> handlePagination(
+    public <T> Map<String, Object> handlePagination(
             Context ctx,
             List<T> allItems,
             String dataType,
@@ -28,7 +28,7 @@ public class JadxAIMCPPaginationUtils {
     }
 
     // Generic pagination handler with custom item transformer
-    public static <T> Map<String, Object> handlePagination(
+    public <T> Map<String, Object> handlePagination(
             Context ctx,
             List<T> allItems,
             String dataType,
@@ -58,7 +58,7 @@ public class JadxAIMCPPaginationUtils {
     }
 
     // Parse and validate pagination parameters
-    private static PaginationParams parsePaginationParams(Context ctx, int totalItems) throws PaginationException {
+    private PaginationParams parsePaginationParams(Context ctx, int totalItems) throws PaginationException {
         String offsetParam = ctx.queryParam("offset");
         String limitParam = ctx.queryParam("limit");
         String countParam = ctx.queryParam("count"); // Legacy support
@@ -114,7 +114,7 @@ public class JadxAIMCPPaginationUtils {
     }
 
     // Calculate pagination boundaries
-    private static PaginationBounds calculatePaginationBounds(PaginationParams params, int totalItems) {
+    private PaginationBounds calculatePaginationBounds(PaginationParams params, int totalItems) {
         if (params.offset >= totalItems) {
             return new PaginationBounds(0, 0, false, totalItems);
         }
@@ -128,7 +128,7 @@ public class JadxAIMCPPaginationUtils {
     }
 
     // Build comprehensive pagination response
-    private static Map<String, Object> buildPaginationResponse(
+    private Map<String, Object> buildPaginationResponse(
             List<Object> data,
             PaginationParams params,
             PaginationBounds bounds,
@@ -176,7 +176,7 @@ public class JadxAIMCPPaginationUtils {
         return result;
     }
 
-    // Helper classes remain the same as before
+    // Helper classes
     private static class PaginationParams {
         final int offset;
         final int limit;

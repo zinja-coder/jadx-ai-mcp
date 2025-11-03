@@ -70,6 +70,7 @@ public class JadxAIMCP implements JadxPlugin {
     private static final int DEFAULT_PORT = 8650;
     private int currentPort = DEFAULT_PORT;
     private Preferences prefs;
+    private JadxAIMCPPaginationUtils paginationUtils;
 
     @Override
     public void init(JadxPluginContext context) {
@@ -90,6 +91,9 @@ public class JadxAIMCP implements JadxPlugin {
             // Initializing Preferences
             prefs = Preferences.userNodeForPackage(JadxAIMCP.class);
             currentPort = prefs.getInt(PREF_KEY_PORT, DEFAULT_PORT);
+
+            // Initializing pagination utils
+            paginationUtils = new JadxAIMCPPaginationUtils();
 
             // Add menu items for port options
             addMenuItems();
@@ -557,7 +561,7 @@ public class JadxAIMCP implements JadxPlugin {
             JadxWrapper wrapper = mainWindow.getWrapper();
             List<JavaClass> classes = wrapper.getIncludedClassesWithInners();
 
-            Map<String, Object> result = PaginationUtils.handlePagination(
+            Map<String, Object> result = paginationUtils.handlePagination(
                     ctx,
                     classes,
                     "class-list",
@@ -566,7 +570,7 @@ public class JadxAIMCP implements JadxPlugin {
 
             ctx.json(result);
 
-        } catch (PaginationUtils.PaginationException e) {
+        } catch (JadxAIMCPPaginationUtils.PaginationException e) {
             logger.error("JADX AI MCP Pagination Error: " + e.getMessage());
             ctx.status(400).json(Map.of("error", "Pagination error: " + e.getMessage()));
         } catch (Exception e) {
@@ -695,8 +699,8 @@ public class JadxAIMCP implements JadxPlugin {
                     return;
                 }
             }
-            ctx.status(404).json(Map.of("error", "Class not found."));
-            logger.error("JADX AI MCP Error: Class not found.");
+            ctx.status(404).json(Map.of("error", "Class " + className + " not  found."));
+            logger.error("JADX AI MCP Error: Class " + className + " not  found.");
         } catch (Exception e) {
             logger.error("JADX AI MCP Error: " + e.getMessage(), e);
             ctx.status(500).json(Map.of("error", "Internal error retrieving class source: " + e.getMessage()));
@@ -758,8 +762,8 @@ public class JadxAIMCP implements JadxPlugin {
                     return;
                 }
             }
-            ctx.status(404).json(Map.of("error", "Class not found."));
-            logger.error("JADX AI MCP Error: Class not found.");
+            ctx.status(404).json(Map.of("error", "Class " + className + " not  found."));
+            logger.error("JADX AI MCP Error: Class " + className + " not  found.");
         } catch (Exception e) {
             logger.error("JADX AI MCP Error: " + e.getMessage(), e);
             ctx.status(500).json(Map.of("error", "Internal error retrieving methods: " + e.getMessage()));
@@ -794,8 +798,8 @@ public class JadxAIMCP implements JadxPlugin {
                     return;
                 }
             }
-            ctx.status(404).json(Map.of("error", "Class not found"));
-            logger.error("JADX AI MCP Error: Class not found.");
+            ctx.status(404).json(Map.of("error", "Class " + className + " not  found."));
+            logger.error("JADX AI MCP Error: Class " + className + " not  found.");
         } catch (Exception e) {
             logger.error("JADX AI MCP Error: " + e.getMessage(), e);
             ctx.status(500).json(Map.of("error", "Internal error retrieving fields: " + e.getMessage()));
@@ -833,8 +837,8 @@ public class JadxAIMCP implements JadxPlugin {
                     return;
                 }
             }
-            ctx.status(404).json(Map.of("error", "Class not found"));
-            logger.error("JADX AI MCP Error: Class not found.");
+            ctx.status(404).json(Map.of("error", "Class " + className + " not  found."));
+            logger.error("JADX AI MCP Error: Class " + className + " not  found.");
         } catch (Exception e) {
             logger.error("JADX AI MCP Error: " + e.getMessage(), e);
             ctx.status(500).json(Map.of("error", "Internal error rename Class: " + e.getMessage()));
@@ -928,8 +932,8 @@ public class JadxAIMCP implements JadxPlugin {
                     }
                 }
             }
-            ctx.status(404).json(Map.of("error", "Class not found"));
-            logger.error("JADX AI MCP Error: Class not found.");
+            ctx.status(404).json(Map.of("error", "Class " + className + " not  found."));
+            logger.error("JADX AI MCP Error: Class " + className + " not  found.");
         } catch (Exception e) {
             logger.error("JADX AI MCP Error: " + e.getMessage(), e);
             ctx.status(500).json(Map.of("error", "Internal error rename field: " + e.getMessage()));
@@ -958,8 +962,8 @@ public class JadxAIMCP implements JadxPlugin {
                     return;
                 }
             }
-            ctx.status(404).json(Map.of("error", "Class not found."));
-            logger.error("JADX AI MCP Error: Class not found.");
+            ctx.status(404).json(Map.of("error", "Class " + className + " not  found."));
+            logger.error("JADX AI MCP Error: Class " + className + " not  found.");
         } catch (Exception e) {
             logger.error("JADX AI MCP Error: " + e.getMessage(), e);
             ctx.status(500).json(Map.of("error", "Internal error retrieving class source: " + e.getMessage()));
@@ -1184,7 +1188,7 @@ private void handleStrings(Context ctx) {
         }
 
         // Use the generic pagination with an explicit transformer signature
-        Map<String, Object> result = PaginationUtils.handlePagination(
+        Map<String, Object> result = paginationUtils.handlePagination(
             ctx,
             allStringEntries,
             "resource/strings-xml",
@@ -1196,7 +1200,7 @@ private void handleStrings(Context ctx) {
         );
 
         ctx.json(result);
-    } catch (JadxAIMCP.PaginationUtils.PaginationException e) {
+    } catch (JadxAIMCPPaginationUtils.PaginationException e) {
         logger.error("JADX AI MCP Pagination Error: {}", e.getMessage());
         ctx.status(400).json(Map.of("error", "Pagination error: " + e.getMessage()));
     } catch (Exception e) {
