@@ -1,4 +1,16 @@
+package jadx.gui.plugins;
+
+//import io.javalin.Javalin;
+import io.javalin.http.Context;
+
+
 public class JadxAIMCPHandlers {
+
+   private Context ctx;
+
+   public void JadxAIMCPHanlders(Context ctx) {
+        this.ctx = ctx;
+   }
     // -------------------------- various request handlers -------------------------- //
     
         // method to handle /health request which is used to ensure plugin and mcp

@@ -56,6 +56,8 @@ import java.util.function.Function;
 import jadx.gui.plugins.JadxAIMCPBanner;
 // Importing pagination utils
 import jadx.gui.plugins.JadxAIMCPPaginationUtils;
+// http request handlers
+import jadx.gui.plugins.JadxAIMCPHandlers;
 
 public class JadxAIMCP implements JadxPlugin {
     private MainWindow mainWindow;
@@ -71,6 +73,7 @@ public class JadxAIMCP implements JadxPlugin {
     private int currentPort = DEFAULT_PORT;
     private Preferences prefs;
     private JadxAIMCPPaginationUtils paginationUtils;
+    private JadxAIMCPHandlers jadxAIMCPHandlers;
 
     @Override
     public void init(JadxPluginContext context) {
@@ -94,6 +97,9 @@ public class JadxAIMCP implements JadxPlugin {
 
             // Initializing pagination utils
             paginationUtils = new JadxAIMCPPaginationUtils();
+
+            // Initializing http request handlers
+            jadxAIMCPHandlers = new JadxAIMCPHandlers();
 
             // Add menu items for port options
             addMenuItems();
