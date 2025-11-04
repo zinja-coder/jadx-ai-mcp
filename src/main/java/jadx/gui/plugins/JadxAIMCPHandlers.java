@@ -1,15 +1,21 @@
 package jadx.gui.plugins;
 
+import org.slf4j.Logger;
+
 //import io.javalin.Javalin;
 import io.javalin.http.Context;
 
 
 public class JadxAIMCPHandlers {
 
-   private Context ctx;
+   //private Context ctx;
+   //private int currentPort;
+   //private boolean serverStarted;
+   private Logger logger;
 
-   public void JadxAIMCPHanlders(Context ctx) {
-        this.ctx = ctx;
+
+   public void JadxAIMCPHanlders(Logger logger) {
+        this.logger = logger;
    }
     // -------------------------- various request handlers -------------------------- //
     

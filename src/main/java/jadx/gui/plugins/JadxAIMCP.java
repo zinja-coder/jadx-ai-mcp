@@ -253,8 +253,8 @@ public class JadxAIMCP implements JadxPlugin {
             app.get("/rename-class", this::handleRenameClass);
             app.get("/rename-method", this::handleRenameMethod);
             app.get("/rename-field", this::handleRenameField);
-            app.get("/health", this::handleHealth);
-
+            app.get("/health", ctx -> jadxAIMCPHandlers.handleHealth(serverStarted, app, currentPort));
+        
             logger.info(JadxAIMCPBanner.banner);
             logger.info(
                     "// -------------------- JADX AI MCP PLUGIN -------------------- //\n\n");
