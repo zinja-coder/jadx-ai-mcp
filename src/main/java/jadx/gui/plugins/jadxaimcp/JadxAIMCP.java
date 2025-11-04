@@ -99,7 +99,7 @@ public class JadxAIMCP implements JadxPlugin {
             paginationUtils = new JadxAIMCPPaginationUtils();
 
             // Initializing http request handlers
-            jadxAIMCPHandlers = new JadxAIMCPHandlers();
+            jadxAIMCPHandlers = new JadxAIMCPHandlers(logger);
 
             // Add menu items for port options
             addMenuItems();

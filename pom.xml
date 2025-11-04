@@ -3,7 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>jadx.gui.plugins</groupId>
+    <groupId>jadx.gui.plugins.jadxaimcp</groupId>
     <artifactId>jadx-ai-mcp</artifactId>
     <version>3.3.5</version>
 
@@ -85,11 +85,11 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.google.gson</pattern>
-                                    <shadedPattern>jadx.gui.plugins.mcp.deps.gson</shadedPattern>
+                                    <shadedPattern>jadx.gui.plugins.jadxaimcp.deps.gson</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>io.javalin</pattern>
-                                    <shadedPattern>jadx.gui.plugins.mcp.deps.javalin</shadedPattern>
+                                    <shadedPattern>jadx.gui.plugins.jadxaimcp.deps.javalin</shadedPattern>
                                 </relocation>
                                 <!--<relocation>
                                     <pattern>org.slf4j</pattern>
@@ -97,7 +97,7 @@
                                 </relocation>-->
                                 <relocation>
                                     <pattern>com.fasterxml.jackson.core</pattern>
-                                    <shadedPattern>jadx.gui.plugins.mcp.deps.com.fasterxml.jackson.core</shadedPattern>
+                                    <shadedPattern>jadx.gui.plugins.jadxaimcp.deps.com.fasterxml.jackson.core</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
