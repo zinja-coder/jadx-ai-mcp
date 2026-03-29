@@ -481,15 +481,53 @@ If the JADX AI MCP Plugin is running on a **different machine** (e.g., JADX on a
 uv run jadx_mcp_server.py --jadx-host 192.168.1.100 --jadx-port 8650
 ```
 
-### CLI Reference
+### CLI Reference — Understanding the Flags
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--http` | off | Serve over HTTP instead of stdio |
-| `--host` | `127.0.0.1` | Bind address for `--http` mode |
-| `--port` | `8651` | Port for `--http` mode |
-| `--jadx-host` | `127.0.0.1` | Hostname/IP of the JADX AI MCP Plugin |
-| `--jadx-port` | `8650` | Port of the JADX AI MCP Plugin |
+There are **two separate connections** and each has its own host/port:
+
+```
+┌─────────────┐    --host / --port     ┌──────────────────┐   --jadx-host / --jadx-port   ┌──────────────────┐
+│  LLM Client │ ◄──────────────────►   │  jadx-mcp-server │ ──────────────────────────►   │  JADX-GUI Plugin │
+│  (Claude,   │   Where the MCP server │                  │   Where the MCP server looks  │  (jadx-ai-mcp)   │
+│   Codex..)  │   LISTENS for clients  │                  │   for the JADX plugin         │                  │
+└─────────────┘                        └──────────────────┘                               └──────────────────┘
+```
+
+| Flag | Default | Controls |
+|------|---------|----------|
+| `--http` | off | Use HTTP transport instead of stdio |
+| `--host` | `127.0.0.1` | **Where the MCP server listens** (bind address for LLM clients) |
+| `--port` | `8651` | **Which port the MCP server listens on** |
+| `--jadx-host` | `127.0.0.1` | **Where to find the JADX plugin** (the target JADX-GUI machine) |
+| `--jadx-port` | `8650` | **Which port the JADX plugin is on** |
+
+### Usage Examples
+
+**Scenario 1 — Everything on the same machine (most common):**
+```bash
+# Default: MCP server on localhost:8651, connects to JADX plugin on localhost:8650
+uv run jadx_mcp_server.py --http
+```
+
+**Scenario 2 — Docker container or WSL (MCP server accessible from host network):**
+```bash
+# MCP server listens on ALL interfaces so the host can reach it
+# JADX plugin is still on the same machine
+uv run jadx_mcp_server.py --http --host 0.0.0.0
+```
+
+**Scenario 3 — JADX-GUI running on a different machine (e.g., remote VM):**
+```bash
+# MCP server runs locally, but connects to JADX plugin on a remote machine
+uv run jadx_mcp_server.py --http --jadx-host 192.168.1.100
+```
+
+**Scenario 4 — Full remote setup (everything on different machines):**
+```bash
+# MCP server listens on all interfaces on port 9999
+# JADX plugin is on a different machine at 192.168.1.100:8652
+uv run jadx_mcp_server.py --http --host 0.0.0.0 --port 9999 --jadx-host 192.168.1.100 --jadx-port 8652
+```
 
 The MCP Configuration for custom jadx port will be as follows for claude:
 
