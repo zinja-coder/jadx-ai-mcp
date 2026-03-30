@@ -718,3 +718,8 @@ Use responsibly. Respect intellectual property. Follow ethical hacking practices
 ---
 
 Built with ❤️ for the reverse engineering and AI communities.
+
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/zinja-coder-jadx-ai-mcp).
+
