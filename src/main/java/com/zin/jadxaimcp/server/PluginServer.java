@@ -60,6 +60,13 @@ public class PluginServer {
             logger.info("// -------------------- JADX AI MCP PLUGIN -------------------- //");
             logger.info("JADX AI MCP Plugin HTTP Server Started at http://127.0.0.1:" + port + "/");
 
+            // warm the inheritance index in the background. Started AFTER the server
+            // is up so that, 1, any client request landing during warm-up still
+            // succeeds (it will block on the same lock and reuse the result) and
+            // 2, a warm-up failure cannot prevent the server from starting.
+            // Daemon thread, lowest priority, exception-safe.
+            com.zin.jadxaimcp.server.routes.AdvancedRoutes.warmInheritanceIndexAsync(mainWindow);
+
         } catch (Exception e) {
             logger.error("JADX-AI-MCP Plugin Error: Could not start HTTP Server. Exception: " + e.getMessage(), e);
             isRunning = false;
@@ -164,6 +171,7 @@ public class PluginServer {
         RefactoringRoutes refactoringRoutes = new RefactoringRoutes(mainWindow);
         DebugRoutes debugRoutes = new DebugRoutes(mainWindow);
         XrefsRoutes xrefsRoutes = new XrefsRoutes(mainWindow);
+        AdvancedRoutes advancedRoutes = new AdvancedRoutes(mainWindow, paginationUtils);
 
         // --- General & Health ---
         app.get("/health", generalRoutes::handleHealth);
@@ -211,6 +219,18 @@ public class PluginServer {
         app.get("/debug/stack-frames", debugRoutes::handleGetStackFrames);
         app.get("/debug/variables", debugRoutes::handleGetVariables);
         app.get("/debug/threads", debugRoutes::handleGetThreads);
+
+        // advanced RE capabilities (added v6.4.0)
+        // high-leverage tools that eliminate the dead-ends hit when
+        // tracing flow through obfuscated APKs without a fully-indexed code search.
+        app.get("/find-string-literals", advancedRoutes::handleFindStringLiterals);
+        app.get("/grep-code", advancedRoutes::handleGrepCode);
+        app.get("/find-methods-by-signature", advancedRoutes::handleFindMethodsBySignature);
+        app.get("/get-callees", advancedRoutes::handleGetCallees);
+        app.get("/get-subclasses", advancedRoutes::handleGetSubclasses);
+        app.get("/get-superclasses", advancedRoutes::handleGetSuperclasses);
+        app.get("/get-implementations", advancedRoutes::handleGetImplementations);
+        app.get("/find-android-components-deep", advancedRoutes::handleFindAndroidComponentsDeep);
     }
 
 }
