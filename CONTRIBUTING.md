@@ -16,7 +16,7 @@ Thank you for considering contributing to the project! We welcome contributions 
    # Create a new branch
    git checkout -b your-feature-branch
 
-   # Add jadx jar file as dependecy in your local maven repository
+   # Add jadx jar file as dependency in your local maven repository
    mvn install:install-file -Dfile=path/to/jadx-<version>-all.jar \
                          -DgroupId=io.github.skylot \
                          -DartifactId=jadx-all \
