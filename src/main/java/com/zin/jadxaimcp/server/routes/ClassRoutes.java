@@ -615,6 +615,10 @@ public class ClassRoutes {
         String searchId = null;
         try {
             JadxWrapper wrapper = mainWindow.getWrapper();
+            if (wrapper == null) {
+                JadxAIMCPPluginError.handleError(ctx, 500, "JadxWrapper not initialized", logger);
+                return;
+            }
             List<JavaClass> allClasses = wrapper.getIncludedClassesWithInners();
             String term = searchTerm.toLowerCase();
 

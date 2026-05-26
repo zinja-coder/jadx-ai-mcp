@@ -3,6 +3,7 @@ package com.zin.jadxaimcp.utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -79,8 +80,15 @@ public class DecompilationCache {
             misses.incrementAndGet();
             return null;
         }
+        String decompressed = decompress(compressed);
+        if (decompressed == null) {
+            // Evict corrupt entry so the next lookup re-decompiles
+            cache.remove(className);
+            misses.incrementAndGet();
+            return null;
+        }
         hits.incrementAndGet();
-        return decompress(compressed);
+        return decompressed;
     }
 
     /**
@@ -134,20 +142,24 @@ public class DecompilationCache {
      * Level 1 compresses at ~500 MB/s with 8-15x ratio on Java source ( according to some AI calculations....).
      */
     private static byte[] compress(byte[] data) {
+        Deflater deflater = new Deflater(Deflater.BEST_SPEED);
         try {
-            Deflater deflater = new Deflater(Deflater.BEST_SPEED);
             deflater.setInput(data);
             deflater.finish();
-            // compressed output buffer -- worst case is slightly larger than input
-            byte[] buffer = new byte[data.length + 64];
-            int compressedSize = deflater.deflate(buffer);
-            deflater.end();
-            byte[] result = new byte[compressedSize];
-            System.arraycopy(buffer, 0, result, 0, compressedSize);
-            return result;
+            ByteArrayOutputStream out = new ByteArrayOutputStream(Math.max(256, data.length / 4));
+            byte[] buffer = new byte[8192];
+            while (!deflater.finished()) {
+                int compressedSize = deflater.deflate(buffer);
+                if (compressedSize > 0) {
+                    out.write(buffer, 0, compressedSize);
+                }
+            }
+            return out.toByteArray();
         } catch (Exception e) {
             logger.warn("Failed to compress source: {}", e.getMessage());
             return null;
+        } finally {
+            deflater.end();
         }
     }
 
@@ -155,27 +167,26 @@ public class DecompilationCache {
      * decompress a Deflate-compressed byte array back to a UTF-8 string.
      */
     private static String decompress(byte[] compressed) {
+        Inflater inflater = new Inflater();
         try {
-            Inflater inflater = new Inflater();
             inflater.setInput(compressed);
-            // typical ratio is 10-15x, so allocate generously
-            byte[] buffer = new byte[compressed.length * 20];
-            int offset = 0;
+            ByteArrayOutputStream out = new ByteArrayOutputStream(compressed.length * 4);
+            byte[] buffer = new byte[8192];
             while (!inflater.finished()) {
-                int count = inflater.inflate(buffer, offset, buffer.length - offset);
-                if (count == 0 && !inflater.finished()) {
-                    // buffer too small, grow it
-                    byte[] newBuffer = new byte[buffer.length * 2];
-                    System.arraycopy(buffer, 0, newBuffer, 0, offset);
-                    buffer = newBuffer;
+                int count = inflater.inflate(buffer);
+                if (count > 0) {
+                    out.write(buffer, 0, count);
+                } else if (!inflater.finished()) {
+                    logger.warn("Failed to decompress source: inflater stalled");
+                    return null;
                 }
-                offset += count;
             }
-            inflater.end();
-            return new String(buffer, 0, offset, java.nio.charset.StandardCharsets.UTF_8);
+            return out.toString(java.nio.charset.StandardCharsets.UTF_8);
         } catch (Exception e) {
             logger.warn("Failed to decompress source: {}", e.getMessage());
             return null;
+        } finally {
+            inflater.end();
         }
     }
 }
