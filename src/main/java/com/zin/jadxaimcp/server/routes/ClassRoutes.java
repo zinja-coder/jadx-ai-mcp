@@ -380,10 +380,9 @@ public class ClassRoutes {
                 return;
             }
 
-            ctx.json(Map.of("name", mainActivityClass.getFullName(), "type", "code/java", "content",
-                    decompilationCache.get(mainActivityClass.getFullName()) != null
-                            ? decompilationCache.get(mainActivityClass.getFullName())
-                            : cacheAndReturn(mainActivityClass)));
+            String cachedCode = decompilationCache.get(mainActivityClass.getFullName());
+            String code = cachedCode != null ? cachedCode : cacheAndReturn(mainActivityClass);
+            ctx.json(Map.of("name", mainActivityClass.getFullName(), "type", "code/java", "content", code));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx,
                     "Internal error occurred while trying to get the Main Activity class code: " + e.getMessage(), e,

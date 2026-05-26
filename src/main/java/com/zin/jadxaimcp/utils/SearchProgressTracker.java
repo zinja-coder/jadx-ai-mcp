@@ -2,6 +2,7 @@ package com.zin.jadxaimcp.utils;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,7 +66,7 @@ public class SearchProgressTracker {
      * @return the generated searchId for this operation
      */
     public String startSearch(String type, int total) {
-        String searchId = System.currentTimeMillis() + "-" + Long.toHexString(Double.doubleToLongBits(Math.random()));
+        String searchId = UUID.randomUUID().toString();
         // Initialize ALL fields BEFORE setting state to RUNNING.
         // This ensures a concurrent poller never sees RUNNING with stale/zero counters.
         // AtomicReference.set() has volatile-write semantics, so setting state LAST
