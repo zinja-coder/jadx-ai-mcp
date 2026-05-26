@@ -89,12 +89,16 @@ public class RefactoringRoutes {
     public void handleRenameMethod(Context ctx) {
         String methodName = ctx.queryParam("method_name");
         String newName = ctx.queryParam("new_name");
+        String methodSignature = ctx.queryParam("method_signature");
 
         if (validateParams(ctx, methodName, newName))
             return;
 
         // Strip method signature if present
         if (methodName.contains("(")) {
+            if (methodSignature == null || methodSignature.isEmpty()) {
+                methodSignature = methodName.substring(methodName.indexOf('('));
+            }
             methodName = methodName.substring(0, methodName.indexOf('('));
         }
 
@@ -106,7 +110,14 @@ public class RefactoringRoutes {
                 String clsName = cls.getFullName();
                 for (JavaMethod method : cls.getMethods()) {
                     String fullMethodName = clsName + "." + method.getName();
-                    if (fullMethodName.equalsIgnoreCase(methodName)) {
+                    if (fullMethodName.equalsIgnoreCase(methodName) || method.getName().equalsIgnoreCase(methodName)) {
+                        if (methodSignature != null && !methodSignature.isEmpty()) {
+                            String shortId = method.getMethodNode().getMethodInfo().getShortId();
+                            if (!shortId.contains(methodSignature)) {
+                                continue;
+                            }
+                        }
+                        
                         ICodeNodeRef nodeRef = method.getCodeNodeRef();
                         NodeRenamedByUser event = new NodeRenamedByUser(nodeRef, method.getName(), newName);
                         event.setRenameNode(method.getMethodNode());

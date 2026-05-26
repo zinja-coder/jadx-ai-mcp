@@ -50,9 +50,18 @@ public class MethodRoutes {
      */
     public void handleMethodByName(Context ctx) {
         String className = ctx.queryParam("class_name");
+        String methodSignature = ctx.queryParam("method_signature");
 
         String methodName = validateMethodParam(ctx);
         if (methodName == null) return;
+        
+        // Support signature embedded in method_name
+        if (methodName.contains("(")) {
+            if (methodSignature == null || methodSignature.isEmpty()) {
+                methodSignature = methodName.substring(methodName.indexOf('('));
+            }
+            methodName = methodName.substring(0, methodName.indexOf('('));
+        }
 
         try {
             JadxWrapper wrapper = mainWindow.getWrapper();
@@ -66,6 +75,12 @@ public class MethodRoutes {
                 for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
                     for (JavaMethod method : cls.getMethods()) {
                         if (method.getName().equalsIgnoreCase(methodName)) {
+                            if (methodSignature != null && !methodSignature.isEmpty()) {
+                                String shortId = method.getMethodNode().getMethodInfo().getShortId();
+                                if (!shortId.contains(methodSignature)) {
+                                    continue;
+                                }
+                            }
                             returnMethodResult(ctx, cls, method);
                             return;
                         }
@@ -78,6 +93,12 @@ public class MethodRoutes {
                     if (cls.getFullName().equals(className)) {
                         for (JavaMethod method : cls.getMethods()) {
                             if (method.getName().equalsIgnoreCase(methodName)) {
+                                if (methodSignature != null && !methodSignature.isEmpty()) {
+                                    String shortId = method.getMethodNode().getMethodInfo().getShortId();
+                                    if (!shortId.contains(methodSignature)) {
+                                        continue;
+                                    }
+                                }
                                 returnMethodResult(ctx, cls, method);
                                 return;
                             }
