@@ -43,6 +43,12 @@ Thanks to these wonderful people for their contributions ⭐
       </a>
     </td>
     <td>
+      <a href="https://github.com/mostafaNazari702">
+        <img src="https://avatars.githubusercontent.com/u/93077724?v=4" width="30px;" alt=""/>
+        <br /><sub><b>Mostafa Nazari</b></sub>
+      </a>
+    </td>
+    <td>
       <a href="https://github.com/ChineseAStar">
         <img src="https://avatars.githubusercontent.com/u/24355243?v=4" width="30px;" alt=""/>
         <br /><sub><b>ChineseAStar</b></sub>
