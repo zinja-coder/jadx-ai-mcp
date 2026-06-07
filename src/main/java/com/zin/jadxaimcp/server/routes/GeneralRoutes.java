@@ -2,8 +2,6 @@ package com.zin.jadxaimcp.server.routes;
 
 import io.javalin.http.Context;
 
-import jadx.gui.ui.MainWindow;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,11 +13,9 @@ import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
 
 public class GeneralRoutes {
     private static final Logger logger = LoggerFactory.getLogger(GeneralRoutes.class);
-    private final MainWindow mainWindow;
     private final PluginServer server;
 
-    public GeneralRoutes(MainWindow mainWindow, int port, PluginServer server) {
-        this.mainWindow = mainWindow;
+    public GeneralRoutes(int port, PluginServer server) {
         this.server = server;
     }
 
@@ -45,7 +41,14 @@ public class GeneralRoutes {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("status", status);
             result.put("url", url);
-            result.put("security", server.getSecurityConfig().statusForHealth());
+            result.put("mode", server.getProjectMode());
+            Map<String, Object> security = new LinkedHashMap<>(server.getSecurityConfig().statusForHealth());
+            if ("headless".equals(server.getProjectMode())) {
+                security.put("refactor_disabled", true);
+                security.put("debug_disabled", true);
+                security.put("headless_gui_only_tools_disabled", true);
+            }
+            result.put("security", security);
 
             logger.debug("JADX AI MCP Plugin: GOT HEALTH PING");
             ctx.json(result);

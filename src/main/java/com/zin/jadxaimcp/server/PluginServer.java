@@ -3,9 +3,9 @@ package com.zin.jadxaimcp.server;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.UnauthorizedResponse;
-import jadx.gui.ui.MainWindow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jadx.gui.ui.MainWindow;
 
 import com.zin.jadxaimcp.utils.JadxAIMCPBanner;
 import com.zin.jadxaimcp.utils.PaginationUtils;
@@ -20,7 +20,7 @@ public class PluginServer {
     private static final Logger logger = LoggerFactory.getLogger(PluginServer.class);
     // JVM-wide key to store the ServerSocketChannel for cross-classloader shutdown
     private static final String JVM_SERVER_KEY = "jadx-ai-mcp-server-channel";
-    private final MainWindow mainWindow;
+    private final JadxProjectContext projectContext;
     private final int port;
     private Javalin app;
     private final PaginationUtils paginationUtils;
@@ -32,7 +32,11 @@ public class PluginServer {
      * @param port        - The port to listen on
      */
     public PluginServer(MainWindow mainWindow, int port) {
-        this.mainWindow = mainWindow;
+        this(new GuiJadxProjectContext(mainWindow), port);
+    }
+
+    public PluginServer(JadxProjectContext projectContext, int port) {
+        this.projectContext = projectContext;
         this.port = port;
         this.paginationUtils = new PaginationUtils();
     }
@@ -169,19 +173,20 @@ public class PluginServer {
         return securityConfig;
     }
 
+    public String getProjectMode() {
+        return projectContext.getMode();
+    }
+
     /**
      * Registers all HTTP API endpoints with their route handlers.
      */
     private void registerRoutes() {
         // Instantiate Route Controllers
-        // Passing 'mainWindow' and 'paginationUtils' to them so they can do their work
-        GeneralRoutes generalRoutes = new GeneralRoutes(mainWindow, port, this);
-        ClassRoutes classRoutes = new ClassRoutes(mainWindow, paginationUtils);
-        MethodRoutes methodRoutes = new MethodRoutes(mainWindow, paginationUtils);
-        ResourceRoutes resourceRoutes = new ResourceRoutes(mainWindow);
-        RefactoringRoutes refactoringRoutes = new RefactoringRoutes(mainWindow);
-        DebugRoutes debugRoutes = new DebugRoutes(mainWindow);
-        XrefsRoutes xrefsRoutes = new XrefsRoutes(mainWindow);
+        GeneralRoutes generalRoutes = new GeneralRoutes(port, this);
+        ClassRoutes classRoutes = new ClassRoutes(projectContext, paginationUtils);
+        MethodRoutes methodRoutes = new MethodRoutes(projectContext, paginationUtils);
+        ResourceRoutes resourceRoutes = new ResourceRoutes(projectContext);
+        XrefsRoutes xrefsRoutes = new XrefsRoutes(projectContext);
 
         // --- General & Health ---
         app.get("/health", generalRoutes::handleHealth);
@@ -219,7 +224,7 @@ public class PluginServer {
         app.get("/get-resource-file", resourceRoutes::handleGetResourceFile);
 
         // --- Renaming ---
-        if (securityConfig.isRefactorDisabled()) {
+        if (securityConfig.isRefactorDisabled() || projectContext.isHeadless()) {
             app.get("/rename-class", ctx -> rejectDisabled(ctx, "refactoring"));
             app.get("/rename-method", ctx -> rejectDisabled(ctx, "refactoring"));
             app.get("/rename-field", ctx -> rejectDisabled(ctx, "refactoring"));
@@ -236,6 +241,8 @@ public class PluginServer {
             app.get("/rename-field", this::rejectGetMutation);
             app.get("/rename-package", this::rejectGetMutation);
             app.get("/rename-variable", this::rejectGetMutation);
+            MainWindow mainWindow = ((GuiJadxProjectContext) projectContext).getMainWindow();
+            RefactoringRoutes refactoringRoutes = new RefactoringRoutes(mainWindow);
             app.post("/rename-class", refactoringRoutes::handleRenameClass);
             app.post("/rename-method", refactoringRoutes::handleRenameMethod);
             app.post("/rename-field", refactoringRoutes::handleRenameField);
@@ -244,11 +251,13 @@ public class PluginServer {
         }
 
         // --- Debugging ---
-        if (securityConfig.isDebugDisabled()) {
+        if (securityConfig.isDebugDisabled() || projectContext.isHeadless()) {
             app.get("/debug/stack-frames", ctx -> rejectDisabled(ctx, "debug"));
             app.get("/debug/variables", ctx -> rejectDisabled(ctx, "debug"));
             app.get("/debug/threads", ctx -> rejectDisabled(ctx, "debug"));
         } else {
+            MainWindow mainWindow = ((GuiJadxProjectContext) projectContext).getMainWindow();
+            DebugRoutes debugRoutes = new DebugRoutes(mainWindow);
             app.get("/debug/stack-frames", debugRoutes::handleGetStackFrames);
             app.get("/debug/variables", debugRoutes::handleGetVariables);
             app.get("/debug/threads", debugRoutes::handleGetThreads);

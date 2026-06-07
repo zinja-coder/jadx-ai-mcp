@@ -4,8 +4,6 @@ import io.javalin.http.Context;
 
 import jadx.api.JavaClass;
 import jadx.api.JavaMethod;
-import jadx.gui.JadxWrapper;
-import jadx.gui.ui.MainWindow;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,15 +19,16 @@ import com.zin.jadxaimcp.utils.PaginationUtils.PaginationException;
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
 import com.zin.jadxaimcp.utils.SearchProgressTracker;
 import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
+import com.zin.jadxaimcp.server.JadxProjectContext;
 
 public class MethodRoutes {
     private static final Logger logger = LoggerFactory.getLogger(MethodRoutes.class);
-    private final MainWindow mainWindow;
+    private final JadxProjectContext projectContext;
     private final PaginationUtils paginationUtils;
     private final SearchProgressTracker progressTracker = SearchProgressTracker.getInstance();
 
-    public MethodRoutes(MainWindow mainWindow, PaginationUtils paginationUtils) {
-        this.mainWindow = mainWindow;
+    public MethodRoutes(JadxProjectContext projectContext, PaginationUtils paginationUtils) {
+        this.projectContext = projectContext;
         this.paginationUtils = paginationUtils;
     }
 
@@ -65,7 +64,7 @@ public class MethodRoutes {
         }
 
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             if (wrapper == null) {
                 JadxAIMCPPluginError.handleError(ctx, 500, "JadxWrapper not initialized", logger);
                 return;
@@ -133,7 +132,7 @@ public class MethodRoutes {
         if (methodName == null) return;
 
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             if (wrapper == null) {
                 JadxAIMCPPluginError.handleError(ctx, 500, "JadxWrapper not initialized", logger);
                 return;

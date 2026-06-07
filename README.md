@@ -208,8 +208,8 @@ It is combination of two tools:
 
 The following MCP tools are available:
 
-- `fetch_current_class()` — Get the class name and full source of selected class
-- `get_selected_text()` — Get currently selected text
+- `fetch_current_class()` — Get the class name and full source of selected class (GUI mode only)
+- `get_selected_text()` — Get currently selected text (GUI mode only)
 - `get_all_classes()` — List all classes in the project
 - `get_class_source()` — Get full source of a given class
 - `get_method_by_name()` — Fetch a method's source
@@ -226,14 +226,14 @@ The following MCP tools are available:
 - `get_strings()` : Fetches the strings.xml file
 - `get_all_resource_file_names()` : Retrieve all resource files names that exists in application
 - `get_resource_file()` : Retrieve resource file content
-- `rename_class()` : Renames the class name
-- `rename_method()` : Renames the method
-- `rename_field()` : Renames the field
-- `rename_package()` : Renames whole package
-- `rename_variable()` : Renames the variable within a method
-- `debug_get_stack_frames()` : Get the stack frames from jadx debugger
-- `debug_get_threads()` : Get the insights of threads from jadx debugger
-- `debug_get_variables()` : Get the variables from jadx debugger
+- `rename_class()` : Renames the class name (GUI mode only)
+- `rename_method()` : Renames the method (GUI mode only)
+- `rename_field()` : Renames the field (GUI mode only)
+- `rename_package()` : Renames whole package (GUI mode only)
+- `rename_variable()` : Renames the variable within a method (GUI mode only)
+- `debug_get_stack_frames()` : Get the stack frames from jadx debugger (GUI mode only)
+- `debug_get_threads()` : Get the insights of threads from jadx debugger (GUI mode only)
+- `debug_get_variables()` : Get the variables from jadx debugger (GUI mode only)
 - `xrefs_to_class()` : Find all references to a class (returns method-level and class-level references, supports pagination)
 - `xrefs_to_method()` : Find all references to a method (includes override-related methods, supports pagination)
 - `xrefs_to_field()` : Find all references to a field (returns methods that access the field, supports pagination)
@@ -551,6 +551,35 @@ The Java plugin binds to `127.0.0.1` only and requires `Authorization: Bearer <t
 Refactoring endpoints are POST-only because they mutate the open project. Disable them with `JADX_AI_MCP_DISABLE_REFACTOR=true` when you only want read-only analysis. Disable debugger endpoints with `JADX_AI_MCP_DISABLE_DEBUG=true` when runtime variable and thread state should not be exposed.
 
 Outputs derived from APK code, resources, or debugger state are labeled as untrusted artifact data. MCP clients and LLM prompts should treat that content as evidence from the analyzed APK, not as instructions.
+
+### Headless JADX Mode
+
+You can run the Java-side HTTP API without `jadx-gui` by launching the headless server. Headless mode uses `jadx-core` and supports read/search/resource/xref tools that operate on explicit class, method, and resource names.
+
+GUI-only tools are unavailable in headless mode:
+
+- `fetch_current_class` and `get_selected_text`, because there is no selected editor tab.
+- Refactoring endpoints, because current rename implementation uses JADX-GUI events.
+- Debug endpoints, because they read the JADX-GUI debugger panel.
+
+Build and start a local headless server:
+
+```bash
+mvn -q package dependency:build-classpath -Dmdep.outputFile=target/runtime-classpath.txt
+export JADX_AI_MCP_TOKEN="change-me-plugin-token"
+java -cp "target/classes:$(cat target/runtime-classpath.txt)" \
+  com.zin.jadxaimcp.server.HeadlessJadxMcpServer \
+  --input /path/to/app.apk \
+  --port 8650
+```
+
+Then start the Python MCP bridge in headless mode:
+
+```bash
+cd /path/to/jadx-mcp-server
+export JADX_AI_MCP_TOKEN="change-me-plugin-token"
+uv run python jadx_mcp_server.py --jadx-mode headless --jadx-port 8650
+```
 
 If the JADX AI MCP Plugin is running on a **different machine** (e.g., JADX on a remote VM, MCP server on your local host), tunnel the plugin port and connect to the local tunnel endpoint:
 ```bash

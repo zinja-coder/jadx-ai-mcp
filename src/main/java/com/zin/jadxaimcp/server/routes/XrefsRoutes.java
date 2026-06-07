@@ -8,8 +8,6 @@ import jadx.api.JavaMethod;
 import jadx.core.dex.nodes.ClassNode;
 import jadx.core.dex.nodes.FieldNode;
 import jadx.core.dex.nodes.MethodNode;
-import jadx.gui.JadxWrapper;
-import jadx.gui.ui.MainWindow;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,14 +24,15 @@ import com.zin.jadxaimcp.utils.PaginationUtils;
 import com.zin.jadxaimcp.utils.PaginationUtils.PaginationException;
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
 import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
+import com.zin.jadxaimcp.server.JadxProjectContext;
 
 public class XrefsRoutes {
     private static final Logger logger = LoggerFactory.getLogger(XrefsRoutes.class);
-    private final MainWindow mainWindow;
+    private final JadxProjectContext projectContext;
     private final PaginationUtils paginationUtils;
 
-    public XrefsRoutes(MainWindow mainWindow) {
-        this.mainWindow = mainWindow;
+    public XrefsRoutes(JadxProjectContext projectContext) {
+        this.projectContext = projectContext;
         this.paginationUtils = new PaginationUtils();
     }
 
@@ -253,7 +252,7 @@ public class XrefsRoutes {
      * return null.
      */
     private JavaClass findClassByName(Context ctx, String className) {
-        JadxWrapper wrapper = mainWindow.getWrapper();
+        JadxProjectContext wrapper = projectContext;
         for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
             if (cls.getFullName().equals(className)) return cls;
         }

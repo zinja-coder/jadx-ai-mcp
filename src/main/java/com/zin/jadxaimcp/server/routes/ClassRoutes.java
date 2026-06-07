@@ -5,8 +5,6 @@ import io.javalin.http.Context;
 import jadx.api.JavaClass;
 import jadx.api.JavaField;
 import jadx.api.JavaMethod;
-import jadx.gui.JadxWrapper;
-import jadx.gui.ui.MainWindow;
 import jadx.api.ResourceFile;
 import jadx.api.security.IJadxSecurity;
 import jadx.core.utils.android.AndroidManifestParser;
@@ -20,14 +18,13 @@ import org.w3c.dom.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.*;
-import java.awt.*;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.io.InputStream;
 import java.util.EnumSet;
@@ -42,10 +39,12 @@ import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
 import com.zin.jadxaimcp.utils.SearchProgressTracker;
 import com.zin.jadxaimcp.utils.DecompilationCache;
 import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
+import com.zin.jadxaimcp.server.CurrentClassView;
+import com.zin.jadxaimcp.server.JadxProjectContext;
 
 public class ClassRoutes {
     private static final Logger logger = LoggerFactory.getLogger(ClassRoutes.class);
-    private final MainWindow mainWindow;
+    private final JadxProjectContext projectContext;
     private final PaginationUtils paginationUtils;
     private final SearchProgressTracker progressTracker = SearchProgressTracker.getInstance();
     private final DecompilationCache decompilationCache = DecompilationCache.getInstance();
@@ -79,8 +78,8 @@ public class ClassRoutes {
     // Pattern to detect jadx obfuscated package names (e.g., p000, p001, p123)
     private static final Pattern OBFUSCATED_PACKAGE_PATTERN = Pattern.compile("^p\\d+$");
 
-    public ClassRoutes(MainWindow mainWindow, PaginationUtils paginationUtils) {
-        this.mainWindow = mainWindow;
+    public ClassRoutes(JadxProjectContext projectContext, PaginationUtils paginationUtils) {
+        this.projectContext = projectContext;
         this.paginationUtils = paginationUtils;
     }
 
@@ -102,13 +101,18 @@ public class ClassRoutes {
      */
     public void handleCurrentClass(Context ctx) {
         try {
-            String className = getSelectedTabTitle();
-            String code = extractTextFromCurrentTab();
+            Optional<CurrentClassView> currentClass = projectContext.getCurrentClassView();
+            if (currentClass.isEmpty()) {
+                ctx.status(501).json(Map.of(
+                        "error", "current-class is unavailable in headless mode; use class-source with class_name"));
+                return;
+            }
+            CurrentClassView current = currentClass.get();
 
             Map<String, String> result = new HashMap<>();
-            result.put("name", className != null ? className.replace(".java", "") : "unknown");
+            result.put("name", current.getName() != null ? current.getName() : "unknown");
             result.put("type", "code/java");
-            result.put("content", code != null ? code : "");
+            result.put("content", current.getContent() != null ? current.getContent() : "");
 
             ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (Exception e) {
@@ -131,7 +135,7 @@ public class ClassRoutes {
      */
     public void handleAllClasses(Context ctx) {
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             List<JavaClass> classes = wrapper.getIncludedClassesWithInners();
 
             Map<String, Object> result = paginationUtils.handlePagination(
@@ -165,12 +169,15 @@ public class ClassRoutes {
      */
     public void handleSelectedText(Context ctx) {
         try {
-            Component selectedComponent = mainWindow.getTabbedPane().getSelectedComponent();
-            JTextArea textArea = findTextArea(selectedComponent);
-            String selectedText = textArea != null ? textArea.getSelectedText() : null;
+            Optional<String> selectedText = projectContext.getSelectedText();
+            if (selectedText.isEmpty()) {
+                ctx.status(501).json(Map.of(
+                        "error", "selected-text is unavailable in headless mode; use explicit class or method tools"));
+                return;
+            }
 
             Map<String, String> result = new HashMap<>();
-            result.put("selectedText", selectedText != null ? selectedText : "");
+            result.put("selectedText", selectedText.get());
             ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx,
@@ -202,7 +209,7 @@ public class ClassRoutes {
         // className = className.replace('$', '.');
 
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
                 if (cls.getFullName().equals(className)) {
                     String code = decompilationCache.get(className);
@@ -248,7 +255,7 @@ public class ClassRoutes {
         // className = className.replace('$', '.');
 
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
                 if (cls.getFullName().equals(className)) {
                     List<String> methods = new ArrayList<>();
@@ -290,7 +297,7 @@ public class ClassRoutes {
             return;
 
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
                 if (cls.getFullName().equals(className)) {
                     List<String> fields = new ArrayList<>();
@@ -325,7 +332,7 @@ public class ClassRoutes {
             return;
 
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
                 if (cls.getFullName().equals(className)) {
                     ctx.result(UntrustedArtifactUtils.labelText(cls.getSmali()));
@@ -351,8 +358,8 @@ public class ClassRoutes {
      */
     public void handleMainActivity(Context ctx) {
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
-            ResourceFile manifestRes = AndroidManifestParser.getAndroidManifest(mainWindow.getWrapper().getResources());
+            JadxProjectContext wrapper = projectContext;
+            ResourceFile manifestRes = AndroidManifestParser.getAndroidManifest(projectContext.getResources());
             if (manifestRes == null) {
                 JadxAIMCPPluginError.handleError(ctx, 404, "AndroidManifest.xml not found", logger);
                 return;
@@ -409,7 +416,7 @@ public class ClassRoutes {
      */
     public void handleMainApplicationClassesNames(Context ctx) {
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             List<ResourceFile> resources = wrapper.getResources();
 
             // get the manifest resource file
@@ -482,7 +489,7 @@ public class ClassRoutes {
      */
     public void handleMainApplicationClassesCode(Context ctx) {
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             List<ResourceFile> resources = wrapper.getResources();
 
             // get the manifest resource file
@@ -615,7 +622,7 @@ public class ClassRoutes {
 
         String searchId = null;
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             if (wrapper == null) {
                 JadxAIMCPPluginError.handleError(ctx, 500, "JadxWrapper not initialized", logger);
                 return;
@@ -961,7 +968,7 @@ public class ClassRoutes {
      */
     public void handleGetPackageTree(Context ctx) {
         try {
-            JadxWrapper wrapper = mainWindow.getWrapper();
+            JadxProjectContext wrapper = projectContext;
             List<JavaClass> allClasses = wrapper.getIncludedClassesWithInners();
 
             // group classes by package
@@ -1065,88 +1072,6 @@ public class ClassRoutes {
             return null;
         }
         return className;
-    }
-
-    /**
-     * @param
-     * @return String
-     * 
-     *         This helper method extracts the selected(currently open class's UI
-     *         tab)'s
-     *         title. First it checks whether the mainWindow is null or not if it is
-     *         null then
-     *         return null.
-     * 
-     *         Then first it gets's the index of TabbedPane if it is -1 then it is
-     *         not valid/ there
-     *         is no selected class UI. Else it extracts title of tab using it's
-     *         index and returns it
-     *         as String.
-     */
-    private String getSelectedTabTitle() {
-        if (mainWindow == null || mainWindow.getTabbedPane() == null)
-            return null;
-
-        int index = mainWindow.getTabbedPane().getSelectedIndex();
-        if (index != -1) {
-            return mainWindow.getTabbedPane().getTitleAt(index);
-        }
-
-        return null;
-    }
-
-    /**
-     * @param
-     * @return String
-     * 
-     *         This helper method extracts the text from current tab (active tab in
-     *         UI) in other
-     *         words, UI where we see class code.
-     * 
-     *         After checking for mainWindow's state for `null`, it first creates
-     *         the Component object
-     *         to store the current tab ( UI where we see class code ), Then using
-     *         findTextArea() it
-     *         extracts all text (class code) from it and return it via
-     *         textArea.getText() method after
-     *         checking for null.
-     */
-    private String extractTextFromCurrentTab() {
-        if (mainWindow == null)
-            return null;
-
-        Component component = mainWindow.getTabbedPane().getSelectedComponent();
-        JTextArea textArea = findTextArea(component);
-
-        return textArea != null ? textArea.getText() : null;
-    }
-
-    /**
-     * @return JTextArea
-     * @param Component
-     *                  Recursively searches for a JTextArea (or compatible
-     *                  component) inside the given container.
-     * 
-     *                  This helper method is used in extractTextFromCurrentTab()
-     *                  method. It takes the UI component
-     *                  and recursively check if there is any JTextArea in that UI
-     *                  compoenet, if yes then return it
-     *                  else return null
-     */
-    private JTextArea findTextArea(Component component) {
-        if (component instanceof JTextArea) {
-            return (JTextArea) component;
-        }
-
-        if (component instanceof Container) {
-            for (Component child : ((Container) component).getComponents()) {
-                JTextArea found = findTextArea(child);
-                if (found != null) {
-                    return found;
-                }
-            }
-        }
-        return null;
     }
 
     /**
