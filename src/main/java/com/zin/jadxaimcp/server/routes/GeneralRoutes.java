@@ -7,7 +7,7 @@ import jadx.gui.ui.MainWindow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.zin.jadxaimcp.server.PluginServer;
@@ -42,11 +42,13 @@ public class GeneralRoutes {
             String status = isRunning ? "Running" : "Stopped";
             String url = isRunning ? "http://127.0.0.1:" + server.getPort() + "/" : "N/A";
 
-            Map<String, String> result = new HashMap<>();
+            Map<String, Object> result = new LinkedHashMap<>();
             result.put("status", status);
             result.put("url", url);
+            result.put("security", server.getSecurityConfig().statusForHealth());
 
             logger.debug("JADX AI MCP Plugin: GOT HEALTH PING");
+            ctx.json(result);
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx, "Internal Error while trying to handle health ping request: " + e.getMessage(), e, logger);
         }

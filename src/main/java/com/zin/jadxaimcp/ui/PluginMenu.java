@@ -1,6 +1,7 @@
 package com.zin.jadxaimcp.ui;
 
 import com.zin.jadxaimcp.JadxAIMCP;
+import com.zin.jadxaimcp.utils.SecurityConfig;
 import jadx.gui.ui.MainWindow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -194,9 +195,18 @@ public class PluginMenu {
         boolean running = plugin.isServerRunning();
         String status = running ? "Running" : "Stopped";
         String url = running ? "http://127.0.0.1:" + plugin.getCurrentPort() + "/" : "N/A";
+        SecurityConfig securityConfig = plugin.getSecurityConfig();
+        String authStatus = securityConfig == null || securityConfig.isAuthDisabled() ? "Disabled" : "Required";
+        String tokenSource = securityConfig != null ? securityConfig.getTokenSource() : "N/A";
+        String token = securityConfig != null && !securityConfig.isAuthDisabled()
+                ? securityConfig.getBearerToken()
+                : "N/A";
 
         JOptionPane.showMessageDialog(mainWindow,
-                "Status " + status + "\nPort: " + plugin.getCurrentPort() + "\nURL: " + url,
+                "Status " + status + "\nPort: " + plugin.getCurrentPort() + "\nURL: " + url
+                        + "\nAuth: " + authStatus
+                        + "\nToken Source: " + tokenSource
+                        + "\nBearer Token: " + token,
                 "MCP Server Status", JOptionPane.INFORMATION_MESSAGE);
     }
 }

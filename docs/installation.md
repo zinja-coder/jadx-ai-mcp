@@ -269,11 +269,12 @@ uv run jadx_mcp_server.py --http --host 0.0.0.0 --port 9999
 
 ### Remote JADX Plugin Configuration
 
-If the JADX AI MCP Plugin is running on a **different machine** (e.g., JADX on a remote VM, MCP server on your local host), use the `--jadx-host` option:
+If the JADX AI MCP Plugin is running on a **different machine** (e.g., JADX on a remote VM, MCP server on your local host), tunnel the plugin port and connect to the local tunnel endpoint:
 
 ```bash
-# Connect to JADX plugin on a remote host
-uv run jadx_mcp_server.py --jadx-host 192.168.1.100 --jadx-port 8650
+# On the machine running the MCP server
+ssh -L 8650:127.0.0.1:8650 remote-host
+uv run jadx_mcp_server.py --jadx-host 127.0.0.1 --jadx-port 8650
 ```
 
 ### Custom Plugin Port Configuration

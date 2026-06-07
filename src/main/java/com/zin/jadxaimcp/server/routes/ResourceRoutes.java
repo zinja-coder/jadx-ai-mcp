@@ -35,6 +35,7 @@ import java.io.InputStream;
 import com.zin.jadxaimcp.utils.PaginationUtils;
 import com.zin.jadxaimcp.utils.PaginationUtils.PaginationException;
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
+import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
 
 public class ResourceRoutes {
     private static final Logger logger = LoggerFactory.getLogger(ResourceRoutes.class);
@@ -65,7 +66,8 @@ public class ResourceRoutes {
             }
             ResContainer container = manifest.loadContent();
             String content = container.getText().getCodeStr();
-            ctx.json(Map.of("name", manifest.getOriginalName(), "type", "manifest/xml", "content", content));
+            ctx.json(UntrustedArtifactUtils.withMetadata(
+                    Map.of("name", manifest.getOriginalName(), "type", "manifest/xml", "content", content)));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx, "Internal error occurred while trying to fetch the AndroidManifest.xml file: " + e.getMessage(), e, logger);
         }
@@ -114,7 +116,7 @@ public class ResourceRoutes {
 
             Map<String, Object> result = paginationUtils.handlePagination(ctx, allStringEntries, "resource/strings-xml",
                                                                           "strings", item->item);
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (PaginationException e) {
             JadxAIMCPPluginError.handleError(ctx, "Internal error while generating pagination result for handleStrings(): " + e.getMessage(), e, logger);
         } catch (Exception e) {
@@ -156,9 +158,11 @@ public class ResourceRoutes {
                     break;
                 } else if ("resources.arsc".equals(resFile.getDeobfName())) {
                     for (ResContainer file : resFile.loadContent().getSubFiles()) {
-                        resFileContent.put("file_name", file.getFileName());
-                        resFileContent.put("content", file.getText().getCodeStr());
-                        break;
+                        if (fileName.equals(file.getFileName())) {
+                            resFileContent.put("file_name", file.getFileName());
+                            resFileContent.put("content", file.getText().getCodeStr());
+                            break;
+                        }
                     }
                 }
                 if (!resFileContent.isEmpty()) break;
@@ -168,7 +172,7 @@ public class ResourceRoutes {
                 JadxAIMCPPluginError.handleError(ctx, 404, "No resource file found", logger);
                 return;
             }
-            ctx.json(Map.of("type", "resource/text", "file", resFileContent));
+            ctx.json(UntrustedArtifactUtils.withMetadata(Map.of("type", "resource/text", "file", resFileContent)));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx, "Internal Error occured while trying to handle the handleGetResourceFile(): " + e.getMessage(), e, logger);
         }
@@ -222,7 +226,7 @@ public class ResourceRoutes {
                 "files",
                 item -> item);
 
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (PaginationException e) {
             JadxAIMCPPluginError.handleError(ctx, "Internal error while generating pagination result for handleListAllResourceFilesNames(): " + e.getMessage(), e, logger);
         } catch (Exception e) {

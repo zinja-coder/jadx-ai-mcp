@@ -41,6 +41,7 @@ import com.zin.jadxaimcp.utils.PaginationUtils.PaginationException;
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
 import com.zin.jadxaimcp.utils.SearchProgressTracker;
 import com.zin.jadxaimcp.utils.DecompilationCache;
+import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
 
 public class ClassRoutes {
     private static final Logger logger = LoggerFactory.getLogger(ClassRoutes.class);
@@ -109,7 +110,7 @@ public class ClassRoutes {
             result.put("type", "code/java");
             result.put("content", code != null ? code : "");
 
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx,
                     "Internal Error while trying to fetch current class class: " + e.getMessage(), e, logger);
@@ -139,7 +140,7 @@ public class ClassRoutes {
                     "class-list",
                     "classes",
                     JavaClass::getFullName);
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (PaginationException e) {
             JadxAIMCPPluginError.handleError(ctx, "Pagination Error: " + e.getMessage(), e, logger);
         } catch (Exception e) {
@@ -170,7 +171,7 @@ public class ClassRoutes {
 
             Map<String, String> result = new HashMap<>();
             result.put("selectedText", selectedText != null ? selectedText : "");
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx,
                     "Internal error while trying to fetch selected text: " + e.getMessage(), e, logger);
@@ -209,7 +210,7 @@ public class ClassRoutes {
                         code = cls.getCode();
                         decompilationCache.put(className, code);
                     }
-                    ctx.result(code);
+                    ctx.result(UntrustedArtifactUtils.labelText(code));
                     return;
                 }
             }
@@ -260,7 +261,7 @@ public class ClassRoutes {
                                 " " + fullMethodName;
                         methods.add(methodData);
                     }
-                    ctx.result(String.join("\n", methods));
+                    ctx.result(UntrustedArtifactUtils.labelText(String.join("\n", methods)));
                     return;
                 }
             }
@@ -299,7 +300,7 @@ public class ClassRoutes {
                                 " " + field.getName();
                         fields.add(fieldData);
                     }
-                    ctx.result(String.join("\n", fields));
+                    ctx.result(UntrustedArtifactUtils.labelText(String.join("\n", fields)));
                     return;
                 }
             }
@@ -327,7 +328,7 @@ public class ClassRoutes {
             JadxWrapper wrapper = mainWindow.getWrapper();
             for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
                 if (cls.getFullName().equals(className)) {
-                    ctx.result(cls.getSmali());
+                    ctx.result(UntrustedArtifactUtils.labelText(cls.getSmali()));
                     return;
                 }
             }
@@ -382,7 +383,8 @@ public class ClassRoutes {
 
             String cachedCode = decompilationCache.get(mainActivityClass.getFullName());
             String code = cachedCode != null ? cachedCode : cacheAndReturn(mainActivityClass);
-            ctx.json(Map.of("name", mainActivityClass.getFullName(), "type", "code/java", "content", code));
+            ctx.json(UntrustedArtifactUtils.withMetadata(
+                    Map.of("name", mainActivityClass.getFullName(), "type", "code/java", "content", code)));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx,
                     "Internal error occurred while trying to get the Main Activity class code: " + e.getMessage(), e,
@@ -448,7 +450,7 @@ public class ClassRoutes {
 
             Map<String, Object> result = new HashMap<>();
             result.put("classes", classesInfo);
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx,
                     "Internal error while trying to fetch all classes names: " + e.getMessage(), e, logger);
@@ -551,7 +553,7 @@ public class ClassRoutes {
                     "classes",
                     item -> item); // Identity function since items are already transformed
 
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (PaginationException e) {
             JadxAIMCPPluginError.handleError(ctx,
                     "Internal error while generating pagination result for handleMainApplicationClassesCode: "
@@ -661,7 +663,7 @@ public class ClassRoutes {
                     "class-list",
                     "classes",
                     JavaClass::getFullName);
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (PaginationException e) {
             if (searchId != null) {
                 progressTracker.failSearch(searchId, e.getMessage());
@@ -987,7 +989,7 @@ public class ClassRoutes {
             result.put("total_classes", allClasses.size());
             result.put("total_packages", packages.size());
             result.put("packages", packages);
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx,
                     "Internal error building package tree: " + e.getMessage(), e, logger);

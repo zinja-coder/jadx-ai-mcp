@@ -73,12 +73,15 @@ SwingUtilities.invokeLater(() -> {
 
 ### Network Security
 - **Localhost Binding**: Plugin binds ONLY to `127.0.0.1`. Remote access blocked.
-- **No Auth**: Relies on OS-level user isolation.
+- **Bearer Authentication**: Plugin HTTP endpoints require `Authorization: Bearer <token>` by default. Configure `JADX_AI_MCP_TOKEN` or read the generated token from the JADX plugin status dialog.
+- **Mutation Gates**: Refactoring endpoints accept POST only and can be disabled with `JADX_AI_MCP_DISABLE_REFACTOR=true`. Debug endpoints can be disabled with `JADX_AI_MCP_DISABLE_DEBUG=true`.
+- **Compatibility Escape Hatch**: `JADX_AI_MCP_AUTH_DISABLED=true` disables plugin authentication and should only be used on isolated local systems.
 
 ### Input Validation
 - **Path Traversal**: Resource paths validated against APK root.
 - **SQL Injection**: Not applicable (no SQL database).
 - **Code Injection**: Refactoring inputs validated for Java naming rules.
+- **Prompt Injection**: Responses derived from APK code, resources, or a debugged process are marked as untrusted artifact data and must not be treated as user or system instructions by the MCP layer.
 
 ### Transport Security
 - **Proxy Isolation**: Python `httpx` client uses `trust_env=False` to prevent OS-level HTTP/HTTPS proxies from intercepting `127.0.0.1` traffic or routing internal API calls externally.
@@ -113,11 +116,14 @@ Large APKs can have 10,000+ classes. Returning all at once causes:
 - **Prompts**: Not currently used
 
 ### HTTP Protocol (Internal)
-- **Method**: GET (mostly)
+- **Method**: GET for read/debug routes, POST for refactoring mutations
 - **Format**: JSON
 - **Status Codes**:
     - `200 OK`: Success
     - `400 Bad Request`: Invalid params
+    - `401 Unauthorized`: Missing or invalid bearer token
+    - `403 Forbidden`: Disabled refactoring or debug endpoint
+    - `405 Method Not Allowed`: Mutation attempted with GET
     - `404 Not Found`: Class/Method missing
     - `500 Server Error`: Internal failure
 

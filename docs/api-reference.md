@@ -174,6 +174,8 @@ callers = await get_xrefs_to_method(
 
 ## Refactoring
 
+Refactoring tools mutate the open JADX project. The Java plugin accepts these HTTP calls with POST only, requires the plugin bearer token by default, and validates Java identifiers/package names before applying changes.
+
 ### `rename_class(class_name: str, new_name: str)`
 
 Renames class and updates references.
@@ -207,6 +209,8 @@ Renames a local variable inside a specific method.
 ---
 
 ## Debugging
+
+Debug tools expose runtime state from the debugged process. They require the plugin bearer token by default and can be disabled with `JADX_AI_MCP_DISABLE_DEBUG=true`.
 
 ### `debug_get_stack_frames()`
 

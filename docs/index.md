@@ -160,14 +160,15 @@ Runtime analysis during JADX debugging sessions.
 ## 🔐 Security & Privacy
 
 - **Secure Defaults**: Server binds to `127.0.0.1` only — remote access must be explicitly enabled
-- **No Authentication**: When binding to non-localhost with `--host 0.0.0.0`, traffic is unencrypted and unauthenticated — use only on trusted networks
+- **Plugin Authentication**: The JADX plugin HTTP control plane requires a bearer token by default
+- **Untrusted APK Output**: Tool output derived from APK code/resources or debugger state is labeled as untrusted artifact data
 - **Proxy Isolation**: Internal HTTP requests use `trust_env=False` to prevent proxy interception
 - **No Data Collection**: No telemetry or usage tracking
 - **Stdio Safety**: Banner and health check output goes to stderr to prevent JSON-RPC stream pollution
 - **Open Source**: Fully auditable codebase
 
 !!! warning "Remote Binding"
-    When using `--host 0.0.0.0`, the MCP server is accessible to anyone on the network over plain HTTP. Use a firewall or SSH tunnel for remote access.
+    When using `--host 0.0.0.0`, the separate Python MCP server is accessible to anyone on the network over plain HTTP unless that server is independently protected. Use a firewall or SSH tunnel for remote access.
 
 ## Supported Platforms
 

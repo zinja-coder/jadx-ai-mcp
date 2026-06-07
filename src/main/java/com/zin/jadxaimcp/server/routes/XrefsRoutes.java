@@ -25,6 +25,7 @@ import java.util.HashSet;
 import com.zin.jadxaimcp.utils.PaginationUtils;
 import com.zin.jadxaimcp.utils.PaginationUtils.PaginationException;
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
+import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
 
 public class XrefsRoutes {
     private static final Logger logger = LoggerFactory.getLogger(XrefsRoutes.class);
@@ -418,6 +419,6 @@ public class XrefsRoutes {
      */
     private void sendXrefsResponse(Context ctx, List<Map<String, String>> referenceList) throws PaginationException {
         Map<String, Object> result = paginationUtils.handlePagination(ctx, referenceList, "xrefs", "references", ref -> ref);
-        ctx.json(result);
+        ctx.json(UntrustedArtifactUtils.withMetadata(result));
     }
 }

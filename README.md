@@ -498,15 +498,17 @@ uv run jadx_mcp_server.py --http --host 0.0.0.0
 
 **Scenario 3 — JADX-GUI running on a different machine (e.g., remote VM):**
 ```bash
-# MCP server runs locally, but connects to JADX plugin on a remote machine
-uv run jadx_mcp_server.py --http --jadx-host 192.168.1.100
+# The Java plugin binds to 127.0.0.1 only. Tunnel the plugin port first:
+ssh -L 8650:127.0.0.1:8650 remote-host
+uv run jadx_mcp_server.py --http --jadx-host 127.0.0.1 --jadx-port 8650
 ```
 
 **Scenario 4 — Full remote setup (everything on different machines):**
 ```bash
 # MCP server listens on all interfaces on port 9999
-# JADX plugin is on a different machine at 192.168.1.100:8652
-uv run jadx_mcp_server.py --http --host 0.0.0.0 --port 9999 --jadx-host 192.168.1.100 --jadx-port 8652
+# Use a tunnel for the Java plugin port; do not expose the plugin directly
+ssh -L 8652:127.0.0.1:8652 remote-host
+uv run jadx_mcp_server.py --http --host 0.0.0.0 --port 9999 --jadx-host 127.0.0.1 --jadx-port 8652
 ```
 
 > [!CAUTION]
@@ -542,10 +544,19 @@ To connect with JADX AI MCP Plugin running on custom port, the `--jadx-port` opt
 uv run jadx_mcp_server.py --jadx-port 8652
 ```
 
-If the JADX AI MCP Plugin is running on a **different machine** (e.g., JADX on a remote VM, MCP server on your local host), use the `--jadx-host` option:
+### JADX Plugin Security Defaults
+
+The Java plugin binds to `127.0.0.1` only and requires `Authorization: Bearer <token>` on HTTP requests by default. Set `JADX_AI_MCP_TOKEN` before launching JADX to provide a stable token, or use the plugin **Server Status** dialog to read the generated local token.
+
+Refactoring endpoints are POST-only because they mutate the open project. Disable them with `JADX_AI_MCP_DISABLE_REFACTOR=true` when you only want read-only analysis. Disable debugger endpoints with `JADX_AI_MCP_DISABLE_DEBUG=true` when runtime variable and thread state should not be exposed.
+
+Outputs derived from APK code, resources, or debugger state are labeled as untrusted artifact data. MCP clients and LLM prompts should treat that content as evidence from the analyzed APK, not as instructions.
+
+If the JADX AI MCP Plugin is running on a **different machine** (e.g., JADX on a remote VM, MCP server on your local host), tunnel the plugin port and connect to the local tunnel endpoint:
 ```bash
-# Connect to JADX plugin on a remote host
-uv run jadx_mcp_server.py --jadx-host 192.168.1.100 --jadx-port 8650
+# On the machine running the MCP server
+ssh -L 8650:127.0.0.1:8650 remote-host
+uv run jadx_mcp_server.py --jadx-host 127.0.0.1 --jadx-port 8650
 ```
 
 ### CLI Reference — Understanding the Flags
@@ -585,15 +596,17 @@ uv run jadx_mcp_server.py --http --host 0.0.0.0
 
 **Scenario 3 — JADX-GUI running on a different machine (e.g., remote VM):**
 ```bash
-# MCP server runs locally, but connects to JADX plugin on a remote machine
-uv run jadx_mcp_server.py --http --jadx-host 192.168.1.100
+# The Java plugin binds to 127.0.0.1 only. Tunnel the plugin port first:
+ssh -L 8650:127.0.0.1:8650 remote-host
+uv run jadx_mcp_server.py --http --jadx-host 127.0.0.1 --jadx-port 8650
 ```
 
 **Scenario 4 — Full remote setup (everything on different machines):**
 ```bash
 # MCP server listens on all interfaces on port 9999
-# JADX plugin is on a different machine at 192.168.1.100:8652
-uv run jadx_mcp_server.py --http --host 0.0.0.0 --port 9999 --jadx-host 192.168.1.100 --jadx-port 8652
+# Use a tunnel for the Java plugin port; do not expose the plugin directly
+ssh -L 8652:127.0.0.1:8652 remote-host
+uv run jadx_mcp_server.py --http --host 0.0.0.0 --port 9999 --jadx-host 127.0.0.1 --jadx-port 8652
 ```
 
 The MCP Configuration for custom jadx port will be as follows for claude:

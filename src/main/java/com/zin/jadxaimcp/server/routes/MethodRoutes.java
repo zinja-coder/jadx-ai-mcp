@@ -20,6 +20,7 @@ import com.zin.jadxaimcp.utils.PaginationUtils;
 import com.zin.jadxaimcp.utils.PaginationUtils.PaginationException;
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
 import com.zin.jadxaimcp.utils.SearchProgressTracker;
+import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
 
 public class MethodRoutes {
     private static final Logger logger = LoggerFactory.getLogger(MethodRoutes.class);
@@ -169,7 +170,7 @@ public class MethodRoutes {
                         .collect(Collectors.toList());
 
                 progressTracker.completeSearch(searchId, results.size());
-                ctx.result(String.join("\n", results));
+                ctx.result(UntrustedArtifactUtils.labelText(String.join("\n", results)));
             } catch (Exception e) {
                 progressTracker.failSearch(searchId, e.getMessage());
                 throw e;
@@ -219,6 +220,6 @@ public class MethodRoutes {
         result.put("method_name", method.getName());
         result.put("decl", String.valueOf(method.getCodeNodeRef()));
         result.put("code", codeStr);
-        ctx.json(result);
+        ctx.json(UntrustedArtifactUtils.withMetadata(result));
     }
 }

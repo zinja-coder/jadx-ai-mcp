@@ -25,6 +25,7 @@ import java.util.prefs.Preferences;
 // Custom imports removed
 import com.zin.jadxaimcp.ui.PluginMenu;
 import com.zin.jadxaimcp.server.PluginServer;
+import com.zin.jadxaimcp.utils.SecurityConfig;
 
 public class JadxAIMCP implements JadxPlugin {
     public static final String PLUGIN_ID = "jadx-ai-mcp";
@@ -288,6 +289,10 @@ public class JadxAIMCP implements JadxPlugin {
      */
     public boolean isServerRunning() {
         return pluginServer != null && pluginServer.isRunning();
+    }
+
+    public SecurityConfig getSecurityConfig() {
+        return pluginServer != null ? pluginServer.getSecurityConfig() : null;
     }
 
     // --- Helpers ---

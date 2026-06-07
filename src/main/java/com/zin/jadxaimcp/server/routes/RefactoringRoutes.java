@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
+import com.zin.jadxaimcp.utils.JavaNameValidator;
 
 public class RefactoringRoutes {
     private static final Logger logger = LoggerFactory.getLogger(RefactoringRoutes.class);
@@ -48,7 +49,9 @@ public class RefactoringRoutes {
         String className = ctx.queryParam("class_name");
         String newName = ctx.queryParam("new_name");
 
-        if (validateParams(ctx, className, newName))
+        if (hasValidationError(ctx,
+                JavaNameValidator.validateOpaqueParameter(className, "class_name"),
+                JavaNameValidator.validateIdentifier(newName, "new_name")))
             return;
 
         try {
@@ -91,7 +94,10 @@ public class RefactoringRoutes {
         String newName = ctx.queryParam("new_name");
         String methodSignature = ctx.queryParam("method_signature");
 
-        if (validateParams(ctx, methodName, newName))
+        if (hasValidationError(ctx,
+                JavaNameValidator.validateOpaqueParameter(methodName, "method_name"),
+                JavaNameValidator.validateIdentifier(newName, "new_name"),
+                validateOptionalOpaque(methodSignature, "method_signature")))
             return;
 
         // Strip method signature if present
@@ -156,7 +162,10 @@ public class RefactoringRoutes {
         String oldFieldName = ctx.queryParam("field_name");
         String newFieldName = ctx.queryParam("new_field_name");
 
-        if (validateParams(ctx, className, oldFieldName, newFieldName))
+        if (hasValidationError(ctx,
+                JavaNameValidator.validateOpaqueParameter(className, "class_name"),
+                JavaNameValidator.validateOpaqueParameter(oldFieldName, "field_name"),
+                JavaNameValidator.validateIdentifier(newFieldName, "new_field_name")))
             return;
 
         try {
@@ -208,7 +217,13 @@ public class RefactoringRoutes {
         String regStr = ctx.queryParam("reg");
         String ssaStr = ctx.queryParam("ssa");
 
-        if (validateParams(ctx, className, methodName, variableName, newName))
+        if (hasValidationError(ctx,
+                JavaNameValidator.validateOpaqueParameter(className, "class_name"),
+                JavaNameValidator.validateOpaqueParameter(methodName, "method_name"),
+                JavaNameValidator.validateOpaqueParameter(variableName, "variable_name"),
+                JavaNameValidator.validateIdentifier(newName, "new_name"),
+                validateOptionalNonNegativeInteger(regStr, "reg"),
+                validateOptionalNonNegativeInteger(ssaStr, "ssa")))
             return;
 
         // Strip method signature if present
@@ -312,7 +327,9 @@ public class RefactoringRoutes {
         String oldPackage = ctx.queryParam("old_package_name");
         String newPackage = ctx.queryParam("new_package_name");
 
-        if (validateParams(ctx, oldPackage, newPackage))
+        if (hasValidationError(ctx,
+                JavaNameValidator.validateQualifiedName(oldPackage, "old_package_name"),
+                JavaNameValidator.validateQualifiedName(newPackage, "new_package_name")))
             return;
 
         try {
@@ -354,58 +371,36 @@ public class RefactoringRoutes {
 
     // Helper methods
 
-    /**
-     * @param Context, String, String
-     * @return boolean
-     * 
-     *         This method is used to validate the availability of required http
-     *         params in RefactoringRoutes
-     *         MCP tool's HTTP requests. If params are ok return true else return
-     *         false.
-     */
-    private boolean validateParams(Context ctx, String p1, String p2) {
-        if (p1 == null || p1.isEmpty() || p2 == null || p2.isEmpty()) {
-            // ctx.status(400).json(Map.of("error", "Missing required parameters."));
-            JadxAIMCPPluginError.handleError(ctx, 400, "Missing required parameters", logger);
-            return true;
+    private boolean hasValidationError(Context ctx, String... errors) {
+        for (String error : errors) {
+            if (error != null) {
+                JadxAIMCPPluginError.handleError(ctx, 400, error, logger);
+                return true;
+            }
         }
         return false;
     }
 
-    /**
-     * @param Context, String, String, String
-     * @return boolean
-     * 
-     *         This method is used to validate the availability of required http
-     *         params in RefactoringRoutes
-     *         MCP tool's HTTP requests. If params are ok return true else return
-     *         false.
-     */
-    private boolean validateParams(Context ctx, String p1, String p2, String p3) {
-        if (p1 == null || p1.isEmpty() || p2 == null || p2.isEmpty()) {
-            // ctx.status(400).json(Map.of("error", "Missing required parameters."));
-            JadxAIMCPPluginError.handleError(ctx, 400, "Missing required parameters", logger);
-            return true;
-        }
-        return false;
+    private String validateOptionalOpaque(String value, String fieldName) {
+        return value == null || value.isEmpty() ? null : JavaNameValidator.validateOpaqueParameter(value, fieldName);
     }
 
-    /**
-     * @param Context, String, String, String, String
-     * @return boolean
-     * 
-     *         This method is used to validate the availability of required http
-     *         params in RefactoringRoutes
-     *         MCP tool's HTTP requests. If params are ok return true else return
-     *         false.
-     */
-    private boolean validateParams(Context ctx, String p1, String p2, String p3, String p4) {
-        if (p1 == null || p1.isEmpty() || p2 == null || p2.isEmpty() || p3 == null || p3.isEmpty() || p4 == null
-                || p4.isEmpty()) {
-            JadxAIMCPPluginError.handleError(ctx, 400, "Missing required parameters", logger);
-            return true;
+    private String validateOptionalNonNegativeInteger(String value, String fieldName) {
+        if (value == null || value.isEmpty()) {
+            return null;
         }
-        return false;
+        String commonError = JavaNameValidator.validateOpaqueParameter(value, fieldName);
+        if (commonError != null) {
+            return commonError;
+        }
+        try {
+            if (Integer.parseInt(value) < 0) {
+                return fieldName + " must be non-negative";
+            }
+        } catch (NumberFormatException e) {
+            return fieldName + " must be an integer";
+        }
+        return null;
     }
 
 }

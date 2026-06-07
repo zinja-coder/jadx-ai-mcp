@@ -1,13 +1,20 @@
 package com.zin.jadxaimcp.server;
 
 import io.javalin.Javalin;
+import io.javalin.http.Context;
+import io.javalin.http.UnauthorizedResponse;
 import jadx.gui.ui.MainWindow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.zin.jadxaimcp.utils.JadxAIMCPBanner;
 import com.zin.jadxaimcp.utils.PaginationUtils;
+import com.zin.jadxaimcp.utils.SecurityConfig;
+import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
 import com.zin.jadxaimcp.server.routes.*; // MCP tool call's request handlers
+
+import java.util.Map;
+import java.util.prefs.Preferences;
 
 public class PluginServer {
     private static final Logger logger = LoggerFactory.getLogger(PluginServer.class);
@@ -17,6 +24,7 @@ public class PluginServer {
     private final int port;
     private Javalin app;
     private final PaginationUtils paginationUtils;
+    private SecurityConfig securityConfig;
     private volatile boolean isRunning = false;
 
     /**
@@ -42,9 +50,13 @@ public class PluginServer {
             closeExistingServerSocket();
 
             // Configure and start Javalin
+            securityConfig = SecurityConfig.load(Preferences.userNodeForPackage(SecurityConfig.class));
             app = Javalin.create(config -> {
                 config.showJavalinBanner = false;
-            }).start(port);
+                config.jetty.defaultHost = SecurityConfig.LOOPBACK_HOST;
+            });
+            app.before(this::enforceRequestSecurity);
+            app.start(SecurityConfig.LOOPBACK_HOST, port);
 
             // Extract and store the underlying ServerSocketChannel (JDK class) JVM-wide
             // so future classloaders can close it even if the old classloader is broken
@@ -59,6 +71,8 @@ public class PluginServer {
             logger.info(JadxAIMCPBanner.banner);
             logger.info("// -------------------- JADX AI MCP PLUGIN -------------------- //");
             logger.info("JADX AI MCP Plugin HTTP Server Started at http://127.0.0.1:" + port + "/");
+            logger.info("JADX AI MCP Plugin auth required: {}, token source: {}",
+                    !securityConfig.isAuthDisabled(), securityConfig.getTokenSource());
 
         } catch (Exception e) {
             logger.error("JADX-AI-MCP Plugin Error: Could not start HTTP Server. Exception: " + e.getMessage(), e);
@@ -151,6 +165,10 @@ public class PluginServer {
         return port;
     }
 
+    public SecurityConfig getSecurityConfig() {
+        return securityConfig;
+    }
+
     /**
      * Registers all HTTP API endpoints with their route handlers.
      */
@@ -201,16 +219,57 @@ public class PluginServer {
         app.get("/get-resource-file", resourceRoutes::handleGetResourceFile);
 
         // --- Renaming ---
-        app.get("/rename-class", refactoringRoutes::handleRenameClass);
-        app.get("/rename-method", refactoringRoutes::handleRenameMethod);
-        app.get("/rename-field", refactoringRoutes::handleRenameField);
-        app.get("/rename-package", refactoringRoutes::handleRenamePackage);
-        app.get("/rename-variable", refactoringRoutes::handleRenameVariable);
+        if (securityConfig.isRefactorDisabled()) {
+            app.get("/rename-class", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.get("/rename-method", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.get("/rename-field", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.get("/rename-package", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.get("/rename-variable", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.post("/rename-class", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.post("/rename-method", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.post("/rename-field", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.post("/rename-package", ctx -> rejectDisabled(ctx, "refactoring"));
+            app.post("/rename-variable", ctx -> rejectDisabled(ctx, "refactoring"));
+        } else {
+            app.get("/rename-class", this::rejectGetMutation);
+            app.get("/rename-method", this::rejectGetMutation);
+            app.get("/rename-field", this::rejectGetMutation);
+            app.get("/rename-package", this::rejectGetMutation);
+            app.get("/rename-variable", this::rejectGetMutation);
+            app.post("/rename-class", refactoringRoutes::handleRenameClass);
+            app.post("/rename-method", refactoringRoutes::handleRenameMethod);
+            app.post("/rename-field", refactoringRoutes::handleRenameField);
+            app.post("/rename-package", refactoringRoutes::handleRenamePackage);
+            app.post("/rename-variable", refactoringRoutes::handleRenameVariable);
+        }
 
         // --- Debugging ---
-        app.get("/debug/stack-frames", debugRoutes::handleGetStackFrames);
-        app.get("/debug/variables", debugRoutes::handleGetVariables);
-        app.get("/debug/threads", debugRoutes::handleGetThreads);
+        if (securityConfig.isDebugDisabled()) {
+            app.get("/debug/stack-frames", ctx -> rejectDisabled(ctx, "debug"));
+            app.get("/debug/variables", ctx -> rejectDisabled(ctx, "debug"));
+            app.get("/debug/threads", ctx -> rejectDisabled(ctx, "debug"));
+        } else {
+            app.get("/debug/stack-frames", debugRoutes::handleGetStackFrames);
+            app.get("/debug/variables", debugRoutes::handleGetVariables);
+            app.get("/debug/threads", debugRoutes::handleGetThreads);
+        }
+    }
+
+    private void enforceRequestSecurity(Context ctx) {
+        if (!"/health".equals(ctx.path())) {
+            UntrustedArtifactUtils.mark(ctx);
+        }
+        if (!securityConfig.isAuthorized(ctx)) {
+            throw new UnauthorizedResponse("Missing or invalid Authorization bearer token");
+        }
+    }
+
+    private void rejectGetMutation(Context ctx) {
+        ctx.status(405).json(Map.of("error", "Refactoring endpoints require POST"));
+    }
+
+    private void rejectDisabled(Context ctx, String featureName) {
+        ctx.status(403).json(Map.of("error", featureName + " tools are disabled by server configuration"));
     }
 
 }

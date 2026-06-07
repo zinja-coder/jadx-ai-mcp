@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
+import com.zin.jadxaimcp.utils.UntrustedArtifactUtils;
 
 public class DebugRoutes {
     private static final Logger logger = LoggerFactory.getLogger(DebugRoutes.class);
@@ -56,7 +57,7 @@ public class DebugRoutes {
                 frames.add(model.getElementAt(i).toString());
             }
 
-            ctx.json(Map.of("stackFrames", frames, "count", frames.size()));
+            ctx.json(UntrustedArtifactUtils.withMetadata(Map.of("stackFrames", frames, "count", frames.size())));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx, "Failed to get stack frames: " + e.getMessage(), e, logger);
         }
@@ -93,7 +94,7 @@ public class DebugRoutes {
             result.put("threads", threads);
             result.put("selectedThread", selected);
             result.put("count", threads.size());
-            ctx.json(result);
+            ctx.json(UntrustedArtifactUtils.withMetadata(result));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx, "Error while trying to get the threads: " + e.getMessage(), e, logger);
         }
@@ -127,7 +128,7 @@ public class DebugRoutes {
             Map<String, Object> variables = new HashMap<>();
             variables.put("registers", extractTreeNodeData(regTreeNode));
             variables.put("thisObject", extractTreeNodeData(thisTreeNode));
-            ctx.json(variables);
+            ctx.json(UntrustedArtifactUtils.withMetadata(variables));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx, "Error while trying to get the debug variables: " + e.getMessage(), e, logger);
         }

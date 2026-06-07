@@ -55,6 +55,7 @@ Manages the embedded Jetty server via Javalin framework.
 - **Host**: `127.0.0.1` (Localhost only for security)
 - **Port**: Configurable (default: 8650)
 - **JSON Mapper**: Uses Jackson for serialization
+- **Authentication**: Bearer token required by default. Configure `JADX_AI_MCP_TOKEN` or read the generated token from the plugin status dialog.
 
 #### Route Registration
 
@@ -150,11 +151,11 @@ Handles code renaming operations.
 
 | Endpoint | Method Handler | Description |
 |----------|----------------|-------------|
-| `/rename-class` | `renameClass` | Renames class & updates refs |
-| `/rename-method` | `renameMethod` | Renames method & updates calls |
-| `/rename-field` | `renameField` | Renames field & updates accesses |
-| `/rename-variable` | `renameVariable` | Renames local variables within a method |
-| `/rename-package` | `renamePackage` | Renames package & updates all classes |
+| `POST /rename-class` | `renameClass` | Renames class & updates refs |
+| `POST /rename-method` | `renameMethod` | Renames method & updates calls |
+| `POST /rename-field` | `renameField` | Renames field & updates accesses |
+| `POST /rename-variable` | `renameVariable` | Renames local variables within a method |
+| `POST /rename-package` | `renamePackage` | Renames package & updates all classes |
 
 **Safety Check:**
 Validates new names against Java naming conventions before applying.
