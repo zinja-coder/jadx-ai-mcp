@@ -428,6 +428,16 @@ uv tool install git+https://github.com/zinja-coder/jadx-mcp-server
 
 and then you can just provide `jadx_mcp_server` in `command` section of mcp configuration.
 
+### Use Autohand Code
+
+After installing the `jadx_mcp_server` executable above, add it with the [Autohand Code CLI](https://github.com/autohandai/code-cli/):
+
+```bash
+autohand mcp add jadx-mcp-server jadx_mcp_server
+```
+
+Add `--scope project` before `jadx-mcp-server` to save the server in the current project's `.autohand` configuration instead of your user configuration.
+
 ## 3. Use Cherry Studio
 
 If you want to configure the MCP tool in Cherry Studio, you can refer to the following configuration.
