@@ -1,232 +1,163 @@
 # Enhanced API Reference
 
-Comprehensive guide to all JADX-AI-MCP tools with detailed usage examples.
+This page documents the MCP tools currently exposed by `jadx_mcp_server.py`.
 
-## Table of Contents
+## Notes About Responses
 
-- [Class Analysis](#class-analysis)
-- [Search Capabilities](#search-capabilities)
-- [Resource Analysis](#resource-analysis)
-- [Cross-Reference Analysis](#cross-reference-analysis)
-- [Refactoring](#refactoring)
-- [Debugging](#debugging)
+- Some underlying plugin endpoints return raw text (`ctx.result(...)` in Java routes).
+- In those cases, the Python MCP server returns:
+  - `{"response": "<raw text>"}` (from `get_from_jadx(...)` fallback)
+- For paginated endpoints, responses generally follow:
+  - `{"type": "...", "items": [...], "pagination": {...}}`
 
 ---
 
 ## Class Analysis
 
-Tools for inspecting decompiled Java code.
-
 ### `fetch_current_class()`
+Fetches the currently selected class from JADX-GUI.
 
-Fetches the currently selected class in JADX-GUI.
-
-**Parameters:** None
-
-**Returns:**
-```json
-{
-  "className": "com.example.MainActivity",
-  "package": "com.example",
-  "source": "public class MainActivity...",
-  "type": "class"
-}
-```
-
-**Use Case:** Quick context for "Explain this class" prompts.
-
----
+### `get_selected_text()`
+Returns selected text from the current editor pane.
 
 ### `get_all_classes(offset: int = 0, count: int = 0)`
-
-Lists all classes in the APK.
-
-**Parameters:**
-- `offset` (int): Starting index
-- `count` (int): Number to return (0 = all)
-
-**Example:**
-```python
-# Get first 100 classes
-classes = await get_all_classes(offset=0, count=100)
-print(f"Total classes: {classes['pagination']['total']}")
-```
-
-**Best Practice:** Always use pagination for production APKs to avoid timeouts.
-
----
+Returns paginated list of all classes. `count=0` means no explicit limit.
 
 ### `get_class_source(class_name: str)`
+Gets full Java source for a class.
 
-Gets full source code for a specific class.
+### `get_methods_of_class(class_name: str)`
+Lists methods for a class.
 
-**Parameters:**
-- `class_name` (str): Fully qualified name
+### `get_fields_of_class(class_name: str)`
+Lists fields for a class.
 
-**Example:**
-```python
-source = await get_class_source("com.example.crypto.AES")
-```
+### `get_smali_of_class(class_name: str)`
+Gets smali for a class.
 
-**Note:** Returns cached source if already decompiled.
+### `get_main_application_classes_names()`
+Returns class names under the app package from `AndroidManifest.xml`.
 
----
+### `get_main_application_classes_code(offset: int = 0, count: int = 0)`
+Returns paginated decompiled code for classes under the app package.
 
-## Search Capabilities
+### `get_main_activity_class()`
+Returns main launcher activity class and source.
 
-### `search_classes_by_keyword(search_term: str, search_in: str = "all", package: str = "", offset: int = 0, count: int = 20)`
+### `get_package_tree()`
+Returns package summary with class counts and `is_likely_library` heuristic.
 
-Full-text search across code with advanced scoping.
+### `get_cache_stats()`
+Returns decompilation cache statistics.
 
-**Parameters:**
-- `search_term` (str): Text to find
-- `search_in` (str): Scope ("all", "code", "comments", "strings")
-- `package` (str): Restrict to specific package (e.g., "com.example")
-- `offset` (int): Start index
-- `count` (int): Max results
-
-**Example:**
-```python
-# Find hardcoded passwords in comments only
-results = await search_classes_by_keyword("password", search_in="comments", count=50)
-
-for res in results['items']:
-    print(f"Found in {res['className']}: {res['preview']}")
-```
+### `clear_cache()`
+Clears decompilation cache and resets counters.
 
 ---
+
+## Search
+
+### `get_method_by_name(class_name: str, method_name: str, method_signature: str = None)`
+Fetches one method body from a specific class.
 
 ### `search_method_by_name(method_name: str)`
+Searches method names globally.
 
-Finds methods matching a name pattern.
+Notes:
+- Matching is substring-based.
+- Current Java route returns a newline-delimited class list as text, so output can be:
+  - `{"response": "com.example.A\ncom.example.B\n..."}`
 
-**Parameters:**
-- `method_name` (str): Name or partial signature
+### `search_classes_by_keyword(search_term: str, package: str = "", search_in: str = "code", offset: int = 0, count: int = 20)`
+Searches classes by keyword with package/scope filters.
 
-**Example:**
-```python
-# Find encryption methods
-methods = await search_method_by_name("encrypt")
-```
+Valid `search_in` values:
+- `class`
+- `method`
+- `field`
+- `code`
+- `comment`
+
+You can combine scopes with commas, for example:
+- `class,method`
+- `class,method,code`
 
 ---
 
-## Resource Analysis
+## Resources
 
 ### `get_android_manifest()`
+Returns parsed/raw manifest payload from plugin endpoint.
 
-Parses AndroidManifest.xml.
+### `get_manifest_component(component_type: str, only_exported: bool = False)`
+Extracts manifest components by type.
 
-**Returns:**
-- Package name
-- Version info
-- Permissions
-- Activities/Services/Receivers/Providers
-- Raw XML
-
-**Use Case:** Security auditing permissions and exported components.
-
----
-
-### `get_manifest_component(type: str)`
-
-Get specific components from AndroidManifest.xml.
-
-**Parameters:**
-- `type` (str): "Activity", "Service", "Receiver", or "Provider"
-
----
+Valid `component_type`:
+- `activity`
+- `service`
+- `receiver`
+- `provider`
 
 ### `get_strings(offset: int = 0, count: int = 0)`
+Returns paginated strings extracted from resources.
 
-Extracts strings from `res/values/strings.xml`.
+### `get_all_resource_file_names(offset: int = 0, count: int = 0)`
+Returns paginated resource file paths.
 
-**Parameters:**
-- `offset` (int): Start index
-- `count` (int): Max strings
-
-**Use Case:** Finding API keys, URLs, or hidden messages.
+### `get_resource_file(resource_name: str)`
+Returns resource file content by path, e.g. `res/layout/activity_main.xml`.
 
 ---
 
-## Cross-Reference Analysis
+## Cross References
 
-### `get_xrefs_to_method(class_name: str, method_name: str, ...)`
+### `get_xrefs_to_class(class_name: str, offset: int = 0, count: int = 20)`
+Finds references to a class.
 
-Finds all callers of a method.
+### `get_xrefs_to_method(class_name: str, method_name: str, offset: int = 0, count: int = 20)`
+Finds references to a method (includes override-related methods in route logic).
 
-**Example:**
-```python
-# Who calls login()?
-callers = await get_xrefs_to_method(
-    "com.example.Auth", 
-    "login",
-    count=100
-)
-```
-
-**Features:**
-- Includes direct calls
-- Includes interface implementations
-- Includes super calls
+### `get_xrefs_to_field(class_name: str, field_name: str, offset: int = 0, count: int = 20)`
+Finds references to a field.
 
 ---
 
 ## Refactoring
 
 ### `rename_class(class_name: str, new_name: str)`
+Renames class.
 
-Renames class and updates references.
+### `rename_method(method_name: str, new_name: str, class_name: str = None, method_signature: str = None)`
+Renames method by name/signature.
 
-**Example:**
-```python
-# Deobfuscate
-await rename_class("a.b.c", "CryptoHelper")
-```
+Notes:
+- `class_name` is optional but strongly recommended for obfuscated apps.
+- If method overloads exist, provide `method_signature` as well.
 
-**Warning:** Affects multiple files. Use carefully.
+### `rename_field(class_name: str, field_name: str, new_name: str)`
+Renames field in a specific class.
 
----
+### `rename_package(old_package_name: str, new_package_name: str)`
+Renames package.
 
-### `rename_method(class_name: str, method_name: str, new_name: str)`
-
-Renames method and updates references.
-
----
-
-### `rename_package(old_pkg: str, new_pkg: str)`
-
-Renames an entire package and updates declarations/imports.
-
----
-
-### `rename_variable(class_name: str, method_name: str, old_var: str, new_var: str)`
-
-Renames a local variable inside a specific method.
+### `rename_variable(class_name: str, method_name: str, variable_name: str, new_name: str, reg: str = None, ssa: str = None)`
+Renames local variable with optional `reg` and `ssa` disambiguation.
 
 ---
 
 ## Debugging
 
 ### `debug_get_stack_frames()`
+Returns stack frames when debugger is active and suspended.
 
-Gets current call stack.
+### `debug_get_threads()`
+Returns debugged-process threads.
 
-**Requirements:**
-- Debugger active
-- Process suspended
-
-**Returns:**
-- List of stack frames (class, method, line)
+### `debug_get_variables()`
+Returns locals/fields from current debug context.
 
 ---
 
-### `debug_get_variables()`
+## Tool Count
 
-Gets local variables and fields.
-
-**Returns:**
-- Locals (name, type, value)
-- Fields (name, type, value)
-
-**Security Note:** Values may contain sensitive data (passwords, keys).
+Current MCP tool count exposed by `jadx_mcp_server.py`: **32**.

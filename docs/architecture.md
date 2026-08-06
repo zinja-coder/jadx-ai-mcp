@@ -1,136 +1,74 @@
 # System Architecture
 
-Deep dive into JADX-AI-MCP technical design.
+## Overview
 
-## High-Level Design
+JADX-AI-MCP uses a two-hop design:
 
-The system follows a **3-Tier Architecture**:
-
-1.  **Presentation Tier**: LLM Client (Claude, Cherry Studio)
-2.  **Application Tier**: MCP Server (Python)
-3.  **Data Tier**: JADX Plugin (Java) + JADX Core
+1. MCP client -> Python MCP server
+2. Python MCP server -> Java plugin HTTP API inside JADX-GUI
 
 ```mermaid
-block-beta
-  columns 3
-  LLM_Client(("LLM Client"))
-  block:MCP
-    MCPServer["MCP Server (Python)"]
-    FastMCP["FastMCP Lib"]
-  end
-  block:Plugin
-    Javalin["Javalin Server"]
-    JADXAPI["JADX API"]
-    GUI["JADX GUI"]
-  end
-
-  LLM_Client --> MCPServer
-  MCPServer --> Javalin
-  Javalin --> JADXAPI
-  JADXAPI --> GUI
+graph LR
+    A[LLM MCP Client] --> B[jadx-mcp-server.py]
+    B --> C[JADX AI MCP Plugin HTTP routes]
+    C --> D[JADX Wrapper + Decompiler + Resources]
 ```
 
----
+## Runtime Layers
 
-## Threading Model
+- **Client layer**: Claude/Codex/other MCP clients
+- **MCP layer**: FastMCP tool registration (`jadx_mcp_server.py`)
+- **Plugin layer**: Javalin routes under `com.zin.jadxaimcp.server.routes`
+- **Decompiler layer**: JADX core + GUI state
 
-### Python Server (AsyncIO)
-- **Single-threaded Event Loop**: Uses `asyncio` for non-blocking I/O
-- **HTTP Client**: `httpx.AsyncClient` handles concurrent requests
-- **Concurrency**: Can handle multiple MCP tool calls simultaneously
+## Transport Modes
 
-### Java Plugin (Multi-threaded)
-- **HTTP Server**: Jetty (via Javalin) uses a thread pool (default: 200 threads)
-- **Request Handling**: Each request runs on a worker thread
-- **UI Interaction**: **CRITICAL** - All JADX API calls accessing UI/Data must run on **Event Dispatch Thread (EDT)**
+- **Stdio mode (default)**: best for local MCP clients
+  - stdout reserved for MCP frames
+  - logs/banners/health output to stderr
+- **HTTP mode (`--http`)**: optional streamable HTTP server
 
-**EDT Pattern:**
-```java
-// Wrong: Direct access from worker thread
-String code = javaClass.getCode(); // ConcurrentModificationException
+## Search and Progress
 
-// Correct: Wrap in invokeLater
-SwingUtilities.invokeLater(() -> {
-    String code = javaClass.getCode(); // Safe
-});
+- Long-running search tools poll `/search-progress`
+- Python search tooling reports progress through MCP context when supported
+- Java `SearchProgressTracker` tracks states like running/completed/failed
+
+## Caching
+
+- Java plugin includes a decompilation cache (`DecompilationCache`)
+- Exposed tools:
+  - `get_cache_stats()`
+  - `clear_cache()`
+
+## Security Model
+
+- Default bind for MCP server and plugin communication is localhost.
+- Remote bind (`--host` not localhost) is unauthenticated plain HTTP.
+- Python HTTP calls use `trust_env=False` to reduce proxy-side interference.
+
+## Pagination
+
+Many endpoints support `offset` and `count`/`limit`.  
+Python side normalizes paginated responses into:
+
+```json
+{
+  "type": "paginated-list",
+  "items": [],
+  "pagination": {
+    "total": 0,
+    "offset": 0,
+    "limit": 0,
+    "count": 0,
+    "has_more": false
+  }
+}
 ```
 
----
+## Source of Truth
 
-## State Management
-
-### Plugin State (Persistent)
-- **Port Configuration**: Stored in `Java Preferences` node `com.zin.jadxaimcp`
-- **Session State**: JADX project state (loaded APK, decompilation cache)
-
-### Server State (Transient)
-- **Configuration**: Loaded from CLI args at startup
-- **Connections**: No persistent connections (HTTP is stateless)
-
----
-
-## 🔒 Security Model
-
-### Network Security
-- **Localhost Binding**: Plugin binds ONLY to `127.0.0.1`. Remote access blocked.
-- **No Auth**: Relies on OS-level user isolation.
-
-### Input Validation
-- **Path Traversal**: Resource paths validated against APK root.
-- **SQL Injection**: Not applicable (no SQL database).
-- **Code Injection**: Refactoring inputs validated for Java naming rules.
-
-### Transport Security
-- **Proxy Isolation**: Python `httpx` client uses `trust_env=False` to prevent OS-level HTTP/HTTPS proxies from intercepting `127.0.0.1` traffic or routing internal API calls externally.
-- **Stdio Integrity**: When running as an MCP stdio server, all internal logging, health checks, and application banners write to `stderr`. The `stdout` stream is strictly reserved for JSON-RPC communication to prevent protocol corruption.
-
----
-
-## Performance Optimization
-
-### Pagination Strategy
-Large APKs can have 10,000+ classes. Returning all at once causes:
-1.  **JSON Serialization Overhead**: 10MB+ responses
-2.  **Network Latency**: Slow transfer
-3.  **Client Timeout**: LLM clients timeout after 60s
-
-**Solution**:
-- All list endpoints support `offset` and `count`
-- Default page size: 100 items
-- Maximum page size: 10,000 items
-
-### Caching
-- **JADX Core**: Caches decompiled source automatically
-- **Plugin**: Does NOT cache responses (to support real-time refactoring)
-
----
-
-## Protocol Specifications
-
-### MCP Protocol (JSON-RPC 2.0)
-- **Tools**: Exposed as MCP tools
-- **Resources**: Not currently used (everything is a tool)
-- **Prompts**: Not currently used
-
-### HTTP Protocol (Internal)
-- **Method**: GET (mostly)
-- **Format**: JSON
-- **Status Codes**:
-    - `200 OK`: Success
-    - `400 Bad Request`: Invalid params
-    - `404 Not Found`: Class/Method missing
-    - `500 Server Error`: Internal failure
-
----
-
-## Tech Stack
-
-| Component | Technology | Version | License |
-|-----------|------------|---------|---------|
-| **Plugin** | Java | 11+ | Apache 2.0 |
-| **Server** | Python | 3.10+ | Apache 2.0 |
-| **HTTP Server** | Javalin | 6.x | Apache 2.0 |
-| **JSON Lib** | Jackson | 2.15+ | Apache 2.0 |
-| **MCP Lib** | FastMCP | Latest | MIT |
-| **Build** | Gradle | 7.x | Apache 2.0 |
-| **Pkg Mgr** | UV | Latest | Apache 2.0 |
+For tool signatures and defaults, use:
+- `jadx-mcp-server/jadx_mcp_server.py`
+- Python tool modules in `jadx-mcp-server/src/server/tools/`
+- Java route handlers in `jadx-ai/src/main/java/com/zin/jadxaimcp/server/routes/`

@@ -62,10 +62,11 @@ uv pip install -r requirements.txt
 ```
 
 ### "Python Version Mismatch"
-**Error**: Syntax errors or import errors
+**Error**: install/runtime failure related to Python requirements
 
 **Solution**:
-Ensure Python 3.10+:
+Use Python 3.10+ for both script run and package install modes.
+
 ```bash
 python3 --version
 ```
