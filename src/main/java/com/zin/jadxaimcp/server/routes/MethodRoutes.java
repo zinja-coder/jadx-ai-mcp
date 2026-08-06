@@ -19,6 +19,7 @@ import java.util.HashMap;
 import com.zin.jadxaimcp.utils.PaginationUtils;
 import com.zin.jadxaimcp.utils.PaginationUtils.PaginationException;
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
+import com.zin.jadxaimcp.utils.MethodSignatures;
 import com.zin.jadxaimcp.utils.SearchProgressTracker;
 
 public class MethodRoutes {
@@ -75,11 +76,8 @@ public class MethodRoutes {
                 for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
                     for (JavaMethod method : cls.getMethods()) {
                         if (method.getName().equalsIgnoreCase(methodName)) {
-                            if (methodSignature != null && !methodSignature.isEmpty()) {
-                                String shortId = method.getMethodNode().getMethodInfo().getShortId();
-                                if (!shortId.contains(methodSignature)) {
-                                    continue;
-                                }
+                            if (!MethodSignatures.matches(method, methodSignature)) {
+                                continue;
                             }
                             returnMethodResult(ctx, cls, method);
                             return;
@@ -93,11 +91,8 @@ public class MethodRoutes {
                     if (cls.getFullName().equals(className)) {
                         for (JavaMethod method : cls.getMethods()) {
                             if (method.getName().equalsIgnoreCase(methodName)) {
-                                if (methodSignature != null && !methodSignature.isEmpty()) {
-                                    String shortId = method.getMethodNode().getMethodInfo().getShortId();
-                                    if (!shortId.contains(methodSignature)) {
-                                        continue;
-                                    }
+                                if (!MethodSignatures.matches(method, methodSignature)) {
+                                    continue;
                                 }
                                 returnMethodResult(ctx, cls, method);
                                 return;

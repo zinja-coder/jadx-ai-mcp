@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.zin.jadxaimcp.utils.JadxAIMCPPluginError;
+import com.zin.jadxaimcp.utils.MethodSignatures;
 
 public class RefactoringRoutes {
     private static final Logger logger = LoggerFactory.getLogger(RefactoringRoutes.class);
@@ -87,6 +88,7 @@ public class RefactoringRoutes {
      * 
      */
     public void handleRenameMethod(Context ctx) {
+        String className = ctx.queryParam("class_name");
         String methodName = ctx.queryParam("method_name");
         String newName = ctx.queryParam("new_name");
         String methodSignature = ctx.queryParam("method_signature");
@@ -104,30 +106,32 @@ public class RefactoringRoutes {
 
         try {
             JadxWrapper wrapper = mainWindow.getWrapper();
-            for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
-                // Fix: removed the .replace('$', '.'); from below line to
-                // prevent bug where innerclasses are discoverable
-                String clsName = cls.getFullName();
-                for (JavaMethod method : cls.getMethods()) {
-                    String fullMethodName = clsName + "." + method.getName();
-                    if (fullMethodName.equalsIgnoreCase(methodName) || method.getName().equalsIgnoreCase(methodName)) {
-                        if (methodSignature != null && !methodSignature.isEmpty()) {
-                            String shortId = method.getMethodNode().getMethodInfo().getShortId();
-                            if (!shortId.contains(methodSignature)) {
-                                continue;
-                            }
-                        }
-                        
-                        ICodeNodeRef nodeRef = method.getCodeNodeRef();
-                        NodeRenamedByUser event = new NodeRenamedByUser(nodeRef, method.getName(), newName);
-                        event.setRenameNode(method.getMethodNode());
-                        event.setResetName(newName.isEmpty());
-                        mainWindow.events().send(event);
-
-                        logger.info("Renaming method {} to {}", method.getName(), newName);
-                        ctx.json(Map.of("result", "Rename method " + method.getName() + " to " + newName));
-                        return;
+            if (className != null && !className.isEmpty()) {
+                JavaClass targetClass = null;
+                for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
+                    if (cls.getFullName().equals(className)) {
+                        targetClass = cls;
+                        break;
                     }
+                }
+
+                if (targetClass == null) {
+                    JadxAIMCPPluginError.handleError(ctx, 404, "Class " + className + " not found.", logger);
+                    return;
+                }
+
+                if (tryRenameMethodInClass(ctx, targetClass, methodName, newName, methodSignature)) {
+                    return;
+                }
+
+                JadxAIMCPPluginError.handleError(ctx, 404,
+                        "Method " + methodName + " not found in class " + className + ".", logger);
+                return;
+            }
+
+            for (JavaClass cls : wrapper.getIncludedClassesWithInners()) {
+                if (tryRenameMethodInClass(ctx, cls, methodName, newName, methodSignature)) {
+                    return;
                 }
             }
             JadxAIMCPPluginError.handleError(ctx, 404,
@@ -136,6 +140,36 @@ public class RefactoringRoutes {
             JadxAIMCPPluginError.handleError(ctx, "Internal error while trying to rename the method: " + e.getMessage(),
                     e, logger);
         }
+    }
+
+    private boolean tryRenameMethodInClass(
+            Context ctx,
+            JavaClass cls,
+            String methodName,
+            String newName,
+            String methodSignature) {
+        String clsName = cls.getFullName();
+        for (JavaMethod method : cls.getMethods()) {
+            String fullMethodName = clsName + "." + method.getName();
+            if (!(fullMethodName.equalsIgnoreCase(methodName) || method.getName().equalsIgnoreCase(methodName))) {
+                continue;
+            }
+
+            if (!MethodSignatures.matches(method, methodSignature)) {
+                continue;
+            }
+
+            ICodeNodeRef nodeRef = method.getCodeNodeRef();
+            NodeRenamedByUser event = new NodeRenamedByUser(nodeRef, method.getName(), newName);
+            event.setRenameNode(method.getMethodNode());
+            event.setResetName(newName.isEmpty());
+            mainWindow.events().send(event);
+
+            logger.info("Renaming method {}.{} to {}", clsName, method.getName(), newName);
+            ctx.json(Map.of("result", "Rename method " + clsName + "." + method.getName() + " to " + newName));
+            return true;
+        }
+        return false;
     }
 
     /**
