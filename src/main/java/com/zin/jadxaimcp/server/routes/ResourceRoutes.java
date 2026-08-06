@@ -147,28 +147,74 @@ public class ResourceRoutes {
 
         try {
             List<ResourceFile> resourceFiles = mainWindow.getWrapper().getResources();
-            Map<String, String> resFileContent = new HashMap<>();
+            String matchedFileName = null;
+            String matchedContent = null;
+            boolean matchedNonText = false;
 
             for (ResourceFile resFile : resourceFiles) {
-                if (resFile.getDeobfName().equals(fileName)) {
-                    resFileContent.put("file_name", resFile.getDeobfName());
-                    resFileContent.put("content", resFile.loadContent().getText().getCodeStr());
+                String deobfName = resFile.getDeobfName();
+
+                // 1) Direct top-level resource match.
+                if (fileName.equals(deobfName)) {
+                    matchedFileName = deobfName;
+                    matchedContent = safeExtractText(safeLoadContent(resFile));
+                    if (matchedContent == null) {
+                        matchedNonText = true;
+                    }
                     break;
-                } else if ("resources.arsc".equals(resFile.getDeobfName())) {
-                    for (ResContainer file : resFile.loadContent().getSubFiles()) {
-                        resFileContent.put("file_name", file.getFileName());
-                        resFileContent.put("content", file.getText().getCodeStr());
+                }
+
+                // 2) Search nested files in any container resource.
+                try {
+                    ResContainer container = resFile.loadContent();
+                    List<ResContainer> subFiles = container.getSubFiles();
+                    if (subFiles == null || subFiles.isEmpty()) {
+                        continue;
+                    }
+
+                    for (ResContainer file : subFiles) {
+                        if (!fileName.equals(file.getFileName())) {
+                            continue;
+                        }
+
+                        matchedFileName = file.getFileName();
+                        matchedContent = safeExtractText(file);
+                        if (matchedContent == null) {
+                            matchedNonText = true;
+                        }
                         break;
                     }
+                } catch (Exception e) {
+                    logger.debug("Failed to inspect subfiles for {}: {}", deobfName, e.getMessage());
                 }
-                if (!resFileContent.isEmpty()) break;
+
+                if (matchedFileName != null) {
+                    break;
+                }
             }
 
-            if (resFileContent.isEmpty()) {
+            if (matchedFileName == null) {
                 JadxAIMCPPluginError.handleError(ctx, 404, "No resource file found", logger);
                 return;
             }
-            ctx.json(Map.of("type", "resource/text", "file", resFileContent));
+
+            if (matchedContent == null) {
+                // Avoid throwing ClassCastException on non-text resources and return
+                // a stable response instead of HTTP 500 (issue #59).
+                Map<String, String> file = new HashMap<>();
+                file.put("file_name", matchedFileName);
+                file.put("content", "");
+                file.put("note", matchedNonText
+                        ? "Matched resource is not text-decodable by JADX"
+                        : "Unable to decode resource content");
+                ctx.json(Map.of("type", "resource/binary", "file", file));
+                return;
+            }
+
+            Map<String, String> file = new HashMap<>();
+            file.put("file_name", matchedFileName);
+            file.put("content", matchedContent);
+            ctx.json(Map.of("type", "resource/text", "file", file));
         } catch (Exception e) {
             JadxAIMCPPluginError.handleError(ctx, "Internal Error occured while trying to handle the handleGetResourceFile(): " + e.getMessage(), e, logger);
         }
@@ -231,6 +277,44 @@ public class ResourceRoutes {
     }
 
     // Helper methods
+
+    /**
+     * Safely extract text content from a resource container.
+     * Some resource kinds are binary-backed and can throw class cast errors when
+     * accessed as text; this helper normalizes those failures to null.
+     */
+    private String safeExtractText(ResContainer container) {
+        if (container == null) {
+            return null;
+        }
+        try {
+            if (container.getText() == null) {
+                return null;
+            }
+            return container.getText().getCodeStr();
+        } catch (ClassCastException e) {
+            logger.debug("Resource is not text-decodable: {}", e.getMessage());
+            return null;
+        } catch (Exception e) {
+            logger.debug("Failed to decode resource text: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private ResContainer safeLoadContent(ResourceFile file) {
+        if (file == null) {
+            return null;
+        }
+        try {
+            return file.loadContent();
+        } catch (ClassCastException e) {
+            logger.debug("Resource content is not loadable as text: {}", e.getMessage());
+            return null;
+        } catch (Exception e) {
+            logger.debug("Failed to load resource content: {}", e.getMessage());
+            return null;
+        }
+    }
 
     /**
      * @param
