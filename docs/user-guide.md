@@ -1,316 +1,75 @@
 # User Guide
 
-Complete guide to using JADX-AI-MCP for Android reverse engineering with AI assistance.
+## Standard Workflow
 
-## Getting Started
+1. Open JADX-GUI and load APK
+2. Start MCP server (`uv run jadx_mcp_server.py`)
+3. Connect MCP client
+4. Start with discovery tools:
+   - `get_package_tree()`
+   - `get_main_activity_class()`
+   - `get_all_classes(...)`
 
-### Initial Setup
+## Useful Prompt Patterns
 
-1. **Launch JADX-GUI** with an APK loaded
-2. **Start your LLM client** (Claude Desktop, Cherry Studio, or LM Studio)
-3. **Verify connection** - Look for the hammer icon (🔨) in your LLM client
+### Initial triage
 
-### Basic Workflow
-
-```mermaid
-graph LR
-    A[Load APK] --> B[Select Class]
-    B --> C[Ask AI]
-    C --> D[Review Results]
-    D --> E{More Analysis?}
-    E -->|Yes| B
-    E -->|No| F[Export/Save]
+```text
+Get package tree, main activity, and main application class names.
+Then summarize likely entry points and sensitive modules.
 ```
 
-## Core Features
+### Security hunt
 
-### 1. Class Analysis
-
-#### Fetching Current Class
-
-Select any class in JADX-GUI and ask:
-
-```
-Fetch the currently selected class and analyze it for security issues
+```text
+Search for WebView, crypto, auth, and manifest risks.
+Return high-risk findings first with class names.
 ```
 
-**What happens:**
-- Plugin captures selected class
-- Sends decompiled source to LLM
-- AI performs SAST (Static Application Security Testing)
-- Returns vulnerability report
+### Refactor/deobfuscate
 
-#### Get Specific Class
-
-```
-Get the source code for class com.example.app.MainActivity
+```text
+Suggest better names for obfuscated classes and fields,
+then apply safe renames incrementally.
 ```
 
-**Use cases:**
-- Analyze specific components
-- Compare class implementations
-- Track obfuscated classes
+## Search Usage
 
-### 2. Code Search
+Use `search_classes_by_keyword` with real supported scopes:
 
-#### Search by Method Name
-
-```
-Search for all methods named "encrypt" across the application
-```
-
-**Returns:**
-- All classes containing matching methods
-- Method signatures
-- Locations in codebase
-
-#### Search by Keyword
-
-```
-Search for classes containing the keyword "password"
-```
-
-**Useful for:**
-- Finding credential handling code
-- Locating encryption routines
-- Identifying API endpoints
-
-#### Scoped Search
-
-```
-Search for "http://" only in strings, within the "com.example.network" package
-```
-
-**Scope options:**
-- `all` (default)
+- `class`
+- `method`
+- `field`
 - `code`
-- `comments`
-- `strings`
+- `comment`
 
-#### Pagination Support
+Examples:
 
-For large results:
-
-```
-Search for classes containing "crypto" with pagination offset=0 count=20
-```
-
-### 3. Resource Analysis
-
-#### Android Manifest
-
-```
-Analyze the AndroidManifest.xml for security issues
+```text
+search_classes_by_keyword(search_term="password", search_in="code")
+search_classes_by_keyword(search_term="retrofit", search_in="class,method")
+search_classes_by_keyword(search_term="token", package="com.example.auth", search_in="field,code")
 ```
 
-**Checks:**
-- Dangerous permissions
-- Exported components
-- Intent filters
-- Debug flags
+Default `search_in` is `code`.
 
-#### Specific Manifest Components
+## Refactor Usage Notes
 
-```
-Get all exported Activities from the Manifest
-```
+- `rename_class(class_name, new_name)` is class-scoped.
+- `rename_field(class_name, field_name, new_name)` is class-scoped.
+- `rename_method(method_name, new_name, class_name=None, method_signature=None)` supports optional class scoping.
 
-**Use cases:**
-- Deep dive into Specific Components (Activities, Services, Receivers, Providers)
-- Finding unprotected endpoints
+When renaming methods in obfuscated apps, pass both `class_name` and `method_signature` where possible.
 
-#### Strings Extraction
+## Debug Session Tips
 
-```
-Get all strings from strings.xml files
-```
+For debugger tools (`debug_get_stack_frames`, `debug_get_threads`, `debug_get_variables`):
 
-**Use cases:**
-- Find hardcoded secrets
-- Identify API endpoints
-- Extract user-facing text
+- Ensure process is paused on a breakpoint.
+- Pull stack + variables together to understand execution context.
 
-#### Resource Files
+## Large APK Strategy
 
-```
-List all resource files in the APK
-```
-
-```
-Get the content of res/layout/activity_main.xml
-```
-
-### 4. Cross-Reference Analysis (Xrefs)
-
-#### Find Class References
-
-```
-Find all references to class com.example.crypto.AES
-```
-
-**Shows:**
-- Where class is instantiated
-- Constructor calls
-- Static method invocations
-
-#### Find Method References
-
-```
-Find all references to method encryptData in class CryptoHelper
-```
-
-**Reveals:**
-- Call sites
-- Usage patterns
-- Data flow
-
-#### Find Field References
-
-```
-Find all references to field API_KEY in class Config
-```
-
-**Identifies:**
-- Read operations
-- Write operations
-- Potential leaks
-
-### 5. Refactoring
-
-#### Rename Class
-
-```
-Rename class a.b.c to com.example.crypto.AESEncryption
-```
-
-**Benefits:**
-- Improves code readability
-- Aids understanding
-- Simplifies analysis
-
-#### Rename Method
-
-```
-Rename method a() in class Helper to decryptPassword()
-```
-
-#### Rename Variable
-
-```
-Rename variable 'str' locally inside method 'loadConfig' to 'apiKey'
-```
-
-**Benefits:**
-- Simplifies complex function analysis
-- Cleans up minified code
-
-#### Rename Package
-
-```
-Rename package a.b to com.example.utils
-```
-
-**Batch operation:** Renames all classes in the package
-
-### 6. Debugging Support
-
-#### Stack Frames
-
-```
-Get current stack frames from the debugger
-```
-
-**Requirements:**
-- JADX debugger must be active
-- Breakpoint hit
-
-#### Thread Analysis
-
-```
-Get all threads from the debugged process
-```
-
-**Shows:**
-- Thread names
-- Thread states
-- Thread priorities
-
-#### Variable Inspection
-
-```
-Get variables from the current debugging context
-```
-
-**Displays:**
-- Local variables
-- Instance variables
-- Variable values
-
-## Advanced Usage
-
-### Security Analysis Workflows
-
-#### Vulnerability Scanning
-
-```
-Perform a comprehensive security analysis:
-1. Get the AndroidManifest and check for dangerous permissions
-2. Search for classes containing "WebView"
-3. Analyze WebView usage for JavaScript injection vulnerabilities
-4. Search for hardcoded credentials in all classes
-5. Provide a summary report
-```
-
-#### Data Flow Analysis
-
-```
-Trace data flow for sensitive information:
-1. Find all references to getUserPassword method
-2. For each reference, get the calling method's source
-3. Analyze how password is handled
-4. Identify potential security issues
-```
-
-### Obfuscation Analysis
-
-#### Deobfuscation Strategy
-
-```
-Help me deobfuscate this app:
-1. Get main application classes
-2. Identify naming patterns (a.b.c vs meaningful names)
-3. Suggest descriptive names based on functionality
-4. Rename classes systematically
-```
-
-#### Pattern Recognition
-
-```
-Analyze the obfuscation technique:
-1. Get list of all classes
-2. Identify obfuscation patterns
-3. Determine obfuscator type (ProGuard/R8/DexGuard)
-4. Suggest deobfuscation approach
-```
-
-### Large APK Analysis
-
-#### Pagination Strategy
-
-```
-Analyze all classes efficiently:
-1. Get total class count
-2. Fetch classes in batches of 50
-3. For each batch, identify interesting classes
-4. Deep dive into flagged classes
-```
-
-#### Selective Analysis
-
-```
-Focus on high-risk components:
-1. Get main activity class
-2. Get all application package classes
-3. Search for network-related classes
-4. Analyze only crypto and auth classes
-```
+- Use pagination for broad scans (`offset`/`count`).
+- Narrow package scope before deep source extraction.
+- Use cache tools (`get_cache_stats`, `clear_cache`) when switching APKs.
