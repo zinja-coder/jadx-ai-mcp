@@ -2,6 +2,8 @@
 
 # JADX-AI-MCP (Part of Zin MCP Suite)
 
+[![MCP Toplist](https://mcptoplist.com/badge/mcp.so%2Fjadx-ai-mcp%2Fzinja-coder.svg)](https://mcptoplist.com/server/mcp.so%2Fjadx-ai-mcp%2Fzinja-coder)
+
 ⚡ Fully automated MCP server + JADX plugin built to communicate with LLM through MCP to analyze Android APKs using LLMs like Claude — uncover vulnerabilities, analyze APK, and reverse engineer effortlessly.
 
 ![GitHub contributors JADX-AI-MCP](https://img.shields.io/github/contributors/zinja-coder/jadx-ai-mcp)
