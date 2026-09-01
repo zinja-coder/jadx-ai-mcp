@@ -164,6 +164,7 @@ public class PluginServer {
         RefactoringRoutes refactoringRoutes = new RefactoringRoutes(mainWindow);
         DebugRoutes debugRoutes = new DebugRoutes(mainWindow);
         XrefsRoutes xrefsRoutes = new XrefsRoutes(mainWindow);
+        CommentRoutes commentRoutes = new CommentRoutes(mainWindow);
 
         // --- General & Health ---
         app.get("/health", generalRoutes::handleHealth);
@@ -206,6 +207,10 @@ public class PluginServer {
         app.get("/rename-field", refactoringRoutes::handleRenameField);
         app.get("/rename-package", refactoringRoutes::handleRenamePackage);
         app.get("/rename-variable", refactoringRoutes::handleRenameVariable);
+
+        // --- Comments ---
+        app.get("/add-comment", commentRoutes::handleAddComment);
+        app.get("/list-comments", commentRoutes::handleListComments);
 
         // --- Debugging ---
         app.get("/debug/stack-frames", debugRoutes::handleGetStackFrames);

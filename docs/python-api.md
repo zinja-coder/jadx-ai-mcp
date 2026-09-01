@@ -111,6 +111,13 @@ Refactor tools:
 - `rename_package(old_package_name, new_package_name)`
 - `rename_variable(class_name, method_name, variable_name, new_name, reg=None, ssa=None)`
 
+### `src/server/tools/comment_tools.py`
+
+Comment tools:
+
+- `add_comment(class_name, comment, method_name=None, method_signature=None, field_name=None, line=None, style="LINE")`
+- `list_comments(class_name="")`
+
 ### `src/server/tools/xrefs_tools.py`
 
 Xref tools:
