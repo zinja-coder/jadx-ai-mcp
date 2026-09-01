@@ -269,6 +269,8 @@ The following MCP tools are available:
 - `rename_field()` : Renames the field
 - `rename_package()` : Renames whole package
 - `rename_variable()` : Renames the variable within a method
+- `add_comment()` : Adds a comment to a class, method, field, or a single code line (`line=`, the 1-based line number of the decompiled source), shown in JADX-GUI and saved with the project (re-commenting the same target updates it, an empty comment removes it)
+- `list_comments()` : Lists the comments stored in the project, optionally filtered to one class
 - `debug_get_stack_frames()` : Get the stack frames from jadx debugger
 - `debug_get_threads()` : Get the insights of threads from jadx debugger
 - `debug_get_variables()` : Get the variables from jadx debugger

@@ -23,8 +23,9 @@ Returns selected text from the current editor pane.
 ### `get_all_classes(offset: int = 0, count: int = 0)`
 Returns paginated list of all classes. `count=0` means no explicit limit.
 
-### `get_class_source(class_name: str)`
-Gets full Java source for a class.
+### `get_class_source(class_name: str, with_line_numbers: bool = False)`
+Gets full Java source for a class. With `with_line_numbers=True` every line is prefixed
+with its 1-based number, which is what `add_comment` expects in its `line` argument.
 
 ### `get_methods_of_class(class_name: str)`
 Lists methods for a class.
@@ -145,6 +146,39 @@ Renames local variable with optional `reg` and `ssa` disambiguation.
 
 ---
 
+## Comments
+
+### `add_comment(class_name: str, comment: str, method_name: str = None, method_signature: str = None, field_name: str = None, line: int = None, style: str = "LINE")`
+Adds a comment to a class, method, field or a single code line. The comment is stored in
+the project code data, so it renders in the JADX-GUI code view and is saved with the
+project file, just like a comment added from the GUI "Add comment" dialog.
+
+Notes:
+- Pass only `class_name` to comment the class, add `method_name` for a method or
+  `field_name` for a field. Provide `method_signature` when overloads exist.
+- `line` comments a single code line, addressed by its 1-based number in the decompiled
+  source (see `get_class_source(..., with_line_numbers=True)`). It is resolved like the
+  GUI comment shortcut: a statement takes the comment at the end of the line, a
+  declaration line comments that declaration, and a rendered comment line edits the
+  comment below it. Braces and blank lines are rejected, listing the closest usable
+  lines. The response reports `attached_to`: `line`, `method`, `field` or `class`.
+- Commenting a target that already has a comment replaces it; an empty `comment` removes
+  it and returns 404 when there is none.
+- `style` is one of `LINE`, `BLOCK`, `BLOCK_CONDENSED`, `JAVADOC`, `JAVADOC_CONDENSED`.
+- Every write is verified against the freshly decompiled code and the response carries
+  `rendered` and `rendered_at_line`. A comment that does not render is rolled back,
+  restoring any comment it replaced, and returns 422: JADX resolves an anchor by
+  indexing the raw instruction array of the referenced method and drops the comment
+  without an error when that lookup misses.
+
+### `list_comments(class_name: str = "")`
+Lists the comments stored in the project, optionally limited to a single declaring
+class. Each entry reports `class_name`, `node_type` (CLASS/METHOD/FIELD), `node_id`,
+`comment` and `style`; comments attached to a single instruction from the GUI also
+carry `code_ref_type` and `offset`.
+
+---
+
 ## Debugging
 
 ### `debug_get_stack_frames()`
@@ -160,4 +194,4 @@ Returns locals/fields from current debug context.
 
 ## Tool Count
 
-Current MCP tool count exposed by `jadx_mcp_server.py`: **32**.
+Current MCP tool count exposed by `jadx_mcp_server.py`: **34**.

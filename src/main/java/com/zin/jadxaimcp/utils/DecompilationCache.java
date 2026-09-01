@@ -99,6 +99,23 @@ public class DecompilationCache {
     }
 
     /**
+     * remove a single cached class source, so the next request decompiles it again.
+     * Call this after the code of a class changed (e.g. a comment was added),
+     * otherwise the stale pre-change source keeps being served.
+     *
+     * @param className fully qualified class name
+     */
+    public void invalidate(String className) {
+        if (className == null) return;
+        byte[] removed = cache.remove(className);
+        if (removed != null) {
+            // originalBytes is approximate, only the compressed size is tracked back
+            compressedBytes.addAndGet(-removed.length);
+            logger.info("DecompilationCache invalidated entry for {}", className);
+        }
+    }
+
+    /**
      * Clear the entire cache and reset all counters.
      * Call this when opening a new APK/project or for debugging.
      */
