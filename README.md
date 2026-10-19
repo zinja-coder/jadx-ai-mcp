@@ -158,6 +158,66 @@ Thanks to these wonderful people for their contributions ⭐
         <br /><sub><b>Merrg1n</b></sub>
       </a>
     </td>
+    <td>
+      <a href="https://github.com/loaniloroze">
+        <img src="https://avatars.githubusercontent.com/u/45463423?v=4" width="30px;" alt=""/>
+        <br /><sub><b>loaniloroze</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/Imzl-zl">
+        <img src="https://avatars.githubusercontent.com/u/69853158?v=4" width="30px;" alt=""/>
+        <br /><sub><b>Imzl-zl</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/vishalhabib99">
+        <img src="https://avatars.githubusercontent.com/u/265632417?v=4" width="30px;" alt=""/>
+        <br /><sub><b>vishalhabib99</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/taekop">
+        <img src="https://avatars.githubusercontent.com/u/38203748?v=4" width="30px;" alt=""/>
+        <br /><sub><b>taekop</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/fanrong1992">
+        <img src="https://avatars.githubusercontent.com/u/16589152?v=4" width="30px;" alt=""/>
+        <br /><sub><b>fanrong1992</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/pll177">
+        <img src="https://avatars.githubusercontent.com/u/60816646?v=4" width="30px;" alt=""/>
+        <br /><sub><b>pll177</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/pateldarsh20">
+        <img src="https://avatars.githubusercontent.com/u/169054607?v=4" width="30px;" alt=""/>
+        <br /><sub><b>pateldarsh20</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/anotherAwesomeKitten">
+        <img src="https://avatars.githubusercontent.com/u/288227936?v=4" width="30px;" alt=""/>
+        <br /><sub><b>anotherAwesomeKitten</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/b4shful">
+        <img src="https://avatars.githubusercontent.com/u/28313200?v=4" width="30px;" alt=""/>
+        <br /><sub><b>b4shful</b></sub>
+      </a>
+    </td>
+    <td>
+      <a href="https://github.com/izxyz">
+        <img src="https://avatars.githubusercontent.com/u/38035210?v=4" width="30px;" alt=""/>
+        <br /><sub><b>izxyz</b></sub>
+      </a>
+    </td>
   </tr>
 </table>
 
